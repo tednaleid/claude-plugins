@@ -6,6 +6,11 @@ CLI (cross-compile to tar.gz) and macOS app (build DMG with optional signing).
 Both variants create a GitHub release with notes from the annotated tag and
 optionally update a Homebrew tap.
 
+**Important:** Release workflows should not contain standalone test/lint jobs.
+Testing runs in CI on every push/PR. The release workflow triggers on tags
+and should focus solely on building, packaging, releasing, and updating
+homebrew. If the existing release workflow has a redundant test job, remove it.
+
 ## Table of Contents
 
 - [Rust CLI](#rust-cli)

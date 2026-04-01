@@ -70,15 +70,20 @@ Check each concern and classify as present, partial, or missing.
 
 **Justfile**: Does a `justfile` or `Justfile` exist? If yes, which of these
 standard recipes are present: `check`, `test`, `lint`, `fmt`, `build`,
-`install`, `bump`, `retag`, `install-hooks`?
+`install`, `clean`, `bump`, `retag`, `install-hooks`?
 
-**CI workflow**: Does `.github/workflows/ci.yml` exist? Does it run tests,
-linting, and type checking? Does it use `just check`?
+**CI workflow**: Does `.github/workflows/ci.yml` exist? Does it use `just check`
+(or install just + call `just check`)? If CI runs individual commands (e.g.,
+`cargo test` + `cargo clippy` separately instead of `just check`), classify as
+**partial** -- individual commands can drift from the justfile's `check` recipe,
+meaning local checks and CI checks diverge silently.
 
 **Release workflow**: Does `.github/workflows/release.yml` exist? Does it
 build for multiple platforms? Does it create a GitHub release? Does it use
 `--notes-from-tag` (or equivalent) for release notes? Does it update a
-homebrew tap?
+homebrew tap? Also check: are `actions/*` versions current (v5 for checkout
+and artifacts)? Are there redundant test/lint jobs that duplicate what CI
+already runs?
 
 **Homebrew**: Does `scripts/setup-homebrew-tap.sh` exist? Is there a homebrew
 tap update step in the release workflow? For CLIs, this means a formula. For
@@ -114,7 +119,7 @@ with `multiSelect: true` to let the user pick what to set up or upgrade.
 ```
 ## Infrastructure Audit: {project} ({language} {type})
 
-[x] Justfile         -- present (check, test, lint, fmt, build, install, bump, retag)
+[x] Justfile         -- present (check, test, lint, fmt, build, install, clean, bump, retag)
 [x] CI workflow       -- present (.github/workflows/ci.yml)
 [~] Release workflow  -- PARTIAL (builds + releases, but no homebrew update)
 [ ] Homebrew tap      -- MISSING
@@ -159,6 +164,26 @@ When modifying an existing release workflow, add the homebrew update steps
 rather than rewriting the whole file. Preserve existing build matrix and
 packaging steps if they work.
 
+### GitHub Actions Versions
+
+When modifying existing workflows, upgrade all `actions/*` references to match
+the versions in the reference templates. Currently:
+- `actions/checkout@v5`
+- `actions/upload-artifact@v5`
+- `actions/download-artifact@v5`
+- `actions/cache@v4`
+
+Old action versions cause real bugs (e.g., v4 checkout has issues with
+annotated tag fetching). This is not optional -- always upgrade.
+
+### Redundant Jobs in Release Workflows
+
+If a release workflow contains a standalone test/lint job that duplicates what
+the CI workflow already runs on push/PR, remove it. Release workflows should
+focus on building, packaging, and publishing. Testing belongs in CI. If the
+release workflow currently has a redundant test job, flag it in the audit as
+part of the release workflow being partial, and remove it when generating.
+
 ### Bump and Retag Convention
 
 Both `just bump` and `just retag` always accept a **bare version number**
@@ -177,6 +202,7 @@ already cover these, add a brief section:
 - `just check` -- run all tests, linting, and type checking (used by CI)
 - `just test` -- run tests only
 - `just lint` -- run linter only
+- `just clean` -- remove build artifacts and caches (use this, never bare rm -rf)
 - `just bump` -- bump version, generate release notes, tag, and push
 - `just retag` -- re-trigger release workflow for an existing version
 
@@ -237,6 +263,11 @@ placeholders.
 
 ## Important Notes
 
+- Every project must have a `just clean` recipe for removing build artifacts,
+  caches, and generated files. Never use bare `rm -rf` commands -- always use
+  `just clean` instead. This keeps destructive operations auditable, safe, and
+  consistent. The clean recipe should remove only project-local artifacts (build
+  output, caches inside the project), never global or user-level directories.
 - No secrets are stored in generated files. All secrets (HOMEBREW_TAP_TOKEN,
   APPLE_CERTIFICATE, etc.) live in GitHub's encrypted secrets and are
   referenced only by name in workflow YAML.

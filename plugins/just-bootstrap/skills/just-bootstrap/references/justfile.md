@@ -4,6 +4,10 @@ Standard recipes for each supported language. Every project gets a consistent
 set of recipes that work the same way. The `check` recipe is the main entry
 point -- it runs everything CI checks, and is used by both CI and pre-commit.
 
+Every project must have a `clean` recipe for removing build artifacts and
+caches. This replaces any bare `rm -rf` usage -- destructive cleanup should
+always go through `just clean` so it's auditable and safe.
+
 Bump, retag, and install-hooks recipes are in their own reference files
 (`bump.md` and `pre-commit.md`).
 
@@ -53,6 +57,10 @@ install:
 # Build and run with arbitrary arguments
 run *ARGS:
     cargo run -- {{ARGS}}
+
+# Remove build artifacts
+clean:
+    cargo clean
 ```
 
 **Notes:**
@@ -156,6 +164,11 @@ run-bg: build
 # Quit the running app gracefully
 stop:
     @osascript -e 'tell application "{APP_NAME}" to quit' 2>/dev/null || echo "{APP_NAME} is not running"
+
+# Remove build artifacts
+clean:
+    rm -rf {{build_dir}}
+    rm -rf DerivedData/
 ```
 
 **Notes:**
@@ -202,6 +215,10 @@ build:
 # Format code (if eslint has --fix or prettier is configured)
 fmt:
     bun run lint -- --fix
+
+# Remove build artifacts and dependencies
+clean:
+    rm -rf node_modules/ dist/ .cache/
 ```
 
 **Notes:**

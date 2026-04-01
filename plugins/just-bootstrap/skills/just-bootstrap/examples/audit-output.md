@@ -19,9 +19,9 @@ GitHub:        tednaleid/veer
 ```
 ## Infrastructure Audit: veer (Zig CLI)
 
-[x] Justfile          -- present (check, test, lint, fmt, build, release, install, bump, retag, bench, fuzz)
-[x] CI workflow        -- present (.github/workflows/ci.yml -- test + lint on ubuntu)
-[x] Release workflow   -- present (.github/workflows/release.yml -- 4 targets, GitHub release)
+[x] Justfile          -- present (check, test, lint, fmt, build, release, install, clean, bump, retag, bench, fuzz)
+[~] CI workflow        -- PARTIAL (runs individual commands, not `just check` -- can drift from local checks)
+[~] Release workflow   -- PARTIAL (builds + releases, but has redundant test job duplicating CI, actions@v4 needs upgrade)
 [ ] Homebrew tap       -- MISSING (no setup script, no tap update in release workflow)
 [~] Bump recipe        -- PARTIAL (creates lightweight tags, no Claude release notes, prints push instructions instead of pushing)
 [~] Retag recipe       -- PARTIAL (uses git tag -f, does not preserve tag annotations)
