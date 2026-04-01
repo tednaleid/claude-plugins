@@ -1,0 +1,13 @@
+{
+  "name": "claude-plugins",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "sync": "tsx scripts/sync-marketplace.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
+  }
+}

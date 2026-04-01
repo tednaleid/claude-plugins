@@ -1,0 +1,18 @@
+{
+  "name": "tednaleid",
+  "owner": {
+    "name": "Ted Naleid"
+  },
+  "plugins": [
+    {
+      "name": "just-bootstrap",
+      "source": "./plugins/just-bootstrap",
+      "description": "Audit and set up CI, release, Justfile, and Homebrew infrastructure for any repo. Detects language automatically and generates normalized build/release tooling.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Ted Naleid"
+      },
+      "keywords": ["ci", "release", "homebrew", "justfile", "bump", "retag", "pre-commit"]
+    }
+  ]
+}
