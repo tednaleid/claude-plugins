@@ -166,16 +166,22 @@ packaging steps if they work.
 
 ### GitHub Actions Versions
 
-When modifying existing workflows, upgrade all `actions/*` references to match
-the versions in the reference templates. Currently:
-- `actions/checkout@v5`
-- `actions/upload-artifact@v5`
-- `actions/download-artifact@v5`
-- `actions/cache@v4`
-- `extractions/setup-just@v3`
+When generating or modifying workflows, use the latest major version of each
+GitHub Action. Check the action's repository or marketplace page to confirm
+the current version rather than assuming. Key actions to keep current:
+- `actions/checkout`
+- `actions/upload-artifact`
+- `actions/download-artifact`
+- `actions/cache`
+- `extractions/setup-just`
+- `softprops/action-gh-release` (if used)
+- Language-specific setup actions (`dtolnay/rust-toolchain`, `mlugg/setup-zig`,
+  `oven-sh/setup-bun`, etc.)
 
-Old action versions cause real bugs (e.g., v4 checkout has issues with
-annotated tag fetching). This is not optional -- always upgrade.
+Old action versions cause real bugs (e.g., older checkout versions have issues
+with annotated tag fetching) and GitHub periodically deprecates the Node.js
+runtime they use. When auditing, flag any actions that are not on their latest
+major version as needing upgrade.
 
 ### Redundant Jobs in Release Workflows
 
