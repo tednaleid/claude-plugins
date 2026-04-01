@@ -7,13 +7,13 @@ Claude Code plugins by Ted Naleid.
 Add the marketplace (one time):
 
 ```bash
-/plugin marketplace add tednaleid/claude-plugins
+claude plugin marketplace add tednaleid/claude-plugins
 ```
 
 Install a plugin:
 
 ```bash
-/plugin install just-bootstrap@tednaleid
+claude plugin install just-bootstrap@tednaleid
 ```
 
 ## Updating
