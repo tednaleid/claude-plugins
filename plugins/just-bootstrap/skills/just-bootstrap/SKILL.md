@@ -172,6 +172,7 @@ the versions in the reference templates. Currently:
 - `actions/upload-artifact@v5`
 - `actions/download-artifact@v5`
 - `actions/cache@v4`
+- `extractions/setup-just@v3`
 
 Old action versions cause real bugs (e.g., v4 checkout has issues with
 annotated tag fetching). This is not optional -- always upgrade.

@@ -44,7 +44,7 @@ jobs:
   platform-specific issues
 - Uses `dtolnay/rust-toolchain@stable` for reliable toolchain setup
 - Runs individual commands rather than `just check` because `just` is not
-  pre-installed on GitHub runners. Alternative: add `extractions/setup-just@v2`
+  pre-installed on GitHub runners. Alternative: add `extractions/setup-just@v3`
   and use `just check`
 
 ### With Just (alternative)
@@ -68,7 +68,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v3
       - run: just check
 ```
 
@@ -94,7 +94,7 @@ jobs:
       - uses: mlugg/setup-zig@v2
         with:
           version: {ZIG_VERSION}
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v3
       - run: just check
 ```
 
@@ -130,7 +130,7 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v3
       - name: Install SwiftLint and xcodegen
         run: brew install swiftlint xcodegen
       - name: Generate Xcode project
@@ -158,7 +158,7 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v3
 
       - name: Cache {FRAMEWORK_NAME}
         id: cache-framework
@@ -216,7 +216,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v3
       - run: just install
       - run: just check
 ```

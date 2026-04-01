@@ -207,7 +207,7 @@ jobs:
           fetch-tags: true
           submodules: recursive
 
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v3
 
       # -- Add framework cache steps here if needed (same as CI) --
 
@@ -362,7 +362,7 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
       - uses: oven-sh/setup-bun@v2
-      - uses: extractions/setup-just@v2
+      - uses: extractions/setup-just@v3
       - run: just install
       - run: just check
       - run: just build
