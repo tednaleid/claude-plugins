@@ -18,21 +18,19 @@ Install a plugin:
 
 ## Updating
 
-Third-party marketplaces do not auto-update by default. To get the latest:
+Third-party marketplaces do not auto-update by default. To get the latest,
+refresh the marketplace (pulls from GitHub), then update the plugin:
 
 ```bash
+claude plugin marketplace update tednaleid
 claude plugin update just-bootstrap@tednaleid
 ```
 
-Or enable auto-update for this marketplace: `/plugin` > Marketplaces tab >
-select `tednaleid` > Enable auto-update. With auto-update enabled, plugins
-refresh at session startup.
+Or enable auto-update via `/plugin` > Marketplaces tab > select `tednaleid` >
+Enable auto-update. With auto-update enabled, the marketplace refreshes at
+session startup and plugins update automatically.
 
-To pick up changes mid-session without restarting:
-
-```
-/reload-plugins
-```
+To pick up plugin changes mid-session without restarting, use `/reload-plugins`.
 
 ## Plugins
 
