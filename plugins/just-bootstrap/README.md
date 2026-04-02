@@ -1,8 +1,8 @@
 # just-bootstrap
 
 Audit and set up CI, release, Justfile, and Homebrew infrastructure for any
-repo. Detects language (Rust, Zig, Swift, TypeScript/Bun) and project type
-(CLI, macOS app) automatically and generates normalized build/release tooling.
+repo. Detects language and project type automatically and generates normalized
+build/release tooling.
 
 ## Usage
 
@@ -26,11 +26,8 @@ The skill will:
 - **Bump/retag** -- Version bumping with Claude-generated release notes and annotated tags
 - **Pre-commit hooks** -- `just install-hooks` to run `just check` before each commit
 
-## Supported Languages
+## Language Support
 
-| Language | Build System | Project Type |
-|----------|-------------|-------------|
-| Rust | Cargo | CLI |
-| Zig | zig build | CLI |
-| Swift | Xcode/XcodeGen | macOS app |
-| TypeScript | Bun | CLI/Web |
+Successfully tested with Rust, Zig, Swift, TypeScript/Bun, Go, and Python, but
+should work with almost any language. The skill detects your build system and
+adapts its output accordingly.
