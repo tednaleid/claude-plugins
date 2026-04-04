@@ -1,6 +1,7 @@
 ---
 name: just-bootstrap
 description: Audit and set up CI, release, Justfile, and Homebrew infrastructure for any repo. Detects language (Rust, Zig, Swift, TypeScript/Bun) and project type (CLI, macOS app) automatically. Use this whenever the user mentions CI setup, release automation, homebrew tap, justfile recipes, bump/retag commands, pre-commit hooks, or wants to normalize build infrastructure across projects. Also use when the user asks about GitHub Actions workflows for building, testing, or releasing their project.
+allowed-tools: Bash(gh release list *)
 ---
 
 # just-bootstrap
@@ -78,17 +79,17 @@ standard recipes are present: `check`, `test`, `lint`, `fmt`, `build`,
 **partial** -- individual commands can drift from the justfile's `check` recipe,
 meaning local checks and CI checks diverge silently. Also flag as **partial**
 if it uses `extractions/setup-just` (deprecated, see GitHub Actions Versions).
-Check every `uses:` action in the workflow for outdated major versions by
-looking up each action's repository -- flag any that are behind as needing
-upgrade.
+Check every `uses:` action in the workflow for outdated major versions --
+flag any that are behind as needing upgrade. To check the latest version of
+an action, run `gh release list --repo <owner>/<repo> --limit 1`.
 
 **Release workflow**: Does `.github/workflows/release.yml` exist? Does it
 build for multiple platforms? Does it create a GitHub release? Does it use
 `--notes-from-tag` (or equivalent) for release notes? Does it update a
 homebrew tap? Does it use `extractions/setup-just` (deprecated)? Check every
-`uses:` action for outdated major versions by looking up each action's
-repository. Are there redundant test/lint jobs that duplicate what CI already
-runs?
+`uses:` action for outdated major versions using
+`gh release list --repo <owner>/<repo> --limit 1`. Are there redundant
+test/lint jobs that duplicate what CI already runs?
 
 **Homebrew**: Does `scripts/setup-homebrew-tap.sh` exist? Is there a homebrew
 tap update step in the release workflow? For CLIs, this means a formula. For
