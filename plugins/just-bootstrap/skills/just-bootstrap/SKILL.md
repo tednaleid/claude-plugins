@@ -173,7 +173,7 @@ the current version rather than assuming. Key actions to keep current:
 - `actions/upload-artifact`
 - `actions/download-artifact`
 - `actions/cache`
-- `extractions/setup-just`
+- `taiki-e/install-action` (with `tool: just`)
 - `softprops/action-gh-release` (if used)
 - Language-specific setup actions (`dtolnay/rust-toolchain`, `mlugg/setup-zig`,
   `oven-sh/setup-bun`, etc.)

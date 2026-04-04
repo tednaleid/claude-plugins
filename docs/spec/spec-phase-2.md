@@ -54,8 +54,8 @@ Complete GitHub Actions CI workflow YAML per language. Each workflow:
 **Key details per language:**
 - Rust: `dtolnay/rust-toolchain@stable`, runs on ubuntu + macos matrix
 - Zig: `mlugg/setup-zig@v2` with pinned version, ubuntu-latest
-- Swift macOS: `macos-26` runner, `extractions/setup-just@v2`, brew install swiftlint + xcodegen
-- TypeScript/Bun: `oven-sh/setup-bun@v2`, `extractions/setup-just@v2`, ubuntu-latest
+- Swift macOS: `macos-26` runner, `taiki-e/install-action@v2` (just), brew install swiftlint + xcodegen
+- TypeScript/Bun: `oven-sh/setup-bun@v2`, `taiki-e/install-action@v2` (just), ubuntu-latest
 
 ### references/release.md
 
