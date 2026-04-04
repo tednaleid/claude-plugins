@@ -78,13 +78,17 @@ standard recipes are present: `check`, `test`, `lint`, `fmt`, `build`,
 **partial** -- individual commands can drift from the justfile's `check` recipe,
 meaning local checks and CI checks diverge silently. Also flag as **partial**
 if it uses `extractions/setup-just` (deprecated, see GitHub Actions Versions).
+Check every `uses:` action in the workflow for outdated major versions by
+looking up each action's repository -- flag any that are behind as needing
+upgrade.
 
 **Release workflow**: Does `.github/workflows/release.yml` exist? Does it
 build for multiple platforms? Does it create a GitHub release? Does it use
 `--notes-from-tag` (or equivalent) for release notes? Does it update a
-homebrew tap? Also check: are `actions/*` versions current (v5 for checkout
-and artifacts)? Does it use `extractions/setup-just` (deprecated)? Are there
-redundant test/lint jobs that duplicate what CI already runs?
+homebrew tap? Does it use `extractions/setup-just` (deprecated)? Check every
+`uses:` action for outdated major versions by looking up each action's
+repository. Are there redundant test/lint jobs that duplicate what CI already
+runs?
 
 **Homebrew**: Does `scripts/setup-homebrew-tap.sh` exist? Is there a homebrew
 tap update step in the release workflow? For CLIs, this means a formula. For
