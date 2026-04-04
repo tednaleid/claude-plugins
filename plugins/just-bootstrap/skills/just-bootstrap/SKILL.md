@@ -76,14 +76,15 @@ standard recipes are present: `check`, `test`, `lint`, `fmt`, `build`,
 (or install just + call `just check`)? If CI runs individual commands (e.g.,
 `cargo test` + `cargo clippy` separately instead of `just check`), classify as
 **partial** -- individual commands can drift from the justfile's `check` recipe,
-meaning local checks and CI checks diverge silently.
+meaning local checks and CI checks diverge silently. Also flag as **partial**
+if it uses `extractions/setup-just` (deprecated, see GitHub Actions Versions).
 
 **Release workflow**: Does `.github/workflows/release.yml` exist? Does it
 build for multiple platforms? Does it create a GitHub release? Does it use
 `--notes-from-tag` (or equivalent) for release notes? Does it update a
 homebrew tap? Also check: are `actions/*` versions current (v5 for checkout
-and artifacts)? Are there redundant test/lint jobs that duplicate what CI
-already runs?
+and artifacts)? Does it use `extractions/setup-just` (deprecated)? Are there
+redundant test/lint jobs that duplicate what CI already runs?
 
 **Homebrew**: Does `scripts/setup-homebrew-tap.sh` exist? Is there a homebrew
 tap update step in the release workflow? For CLIs, this means a formula. For
@@ -182,6 +183,14 @@ Old action versions cause real bugs (e.g., older checkout versions have issues
 with annotated tag fetching) and GitHub periodically deprecates the Node.js
 runtime they use. When auditing, flag any actions that are not on their latest
 major version as needing upgrade.
+
+**Deprecated: `extractions/setup-just`** -- This action depends on
+`extractions/setup-crate`, which is pinned to Node.js 20. GitHub will force
+Node 24 by default on June 2, 2026 and remove Node 20 entirely on
+September 16, 2026 (see extractions/setup-crate#10). When auditing, flag any
+use of `extractions/setup-just` (any version) and replace it with
+`taiki-e/install-action@v2` with `tool: just`. This is a composite action
+with no Node.js runtime dependency, so it is immune to this deprecation.
 
 ### Redundant Jobs in Release Workflows
 
