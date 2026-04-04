@@ -8,6 +8,8 @@ install:
         name=$(basename "$dir")
         echo "Installing $name..."
         claude plugin install "${name}@tednaleid"
+        version=$(claude plugin list 2>&1 | grep -A1 "${name}@tednaleid" | grep "Version:" | awk '{print $2}')
+        echo "  Installed ${name} v${version}"
     done
 
 # Run marketplace sync and verify it's up to date
