@@ -1,3 +1,15 @@
+# Install all plugins from this repo into Claude Code
+install:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    claude plugin marketplace add tednaleid/claude-plugins 2>/dev/null || true
+    claude plugin marketplace update tednaleid
+    for dir in plugins/*/; do
+        name=$(basename "$dir")
+        echo "Installing $name..."
+        claude plugin install "${name}@tednaleid"
+    done
+
 # Run marketplace sync and verify it's up to date
 check: sync
     #!/usr/bin/env bash
