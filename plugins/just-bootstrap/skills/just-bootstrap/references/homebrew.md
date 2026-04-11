@@ -172,23 +172,24 @@ for target in "${TARGETS[@]}"; do
     echo "  ${target}: ${sha}"
 done
 
-# -- Create the tap repo --
-
-if gh repo view "${OWNER}/${TAP_REPO}" &>/dev/null; then
-    echo "Repo ${OWNER}/${TAP_REPO} already exists, skipping creation."
-else
-    echo "Creating ${OWNER}/${TAP_REPO}..."
-    gh repo create "${OWNER}/${TAP_REPO}" --public \
-        --description "Homebrew tap for ${BINARY_NAME}"
-fi
-
-# -- Clone, populate, and push --
+# -- Create or clone the tap repo --
 
 WORKDIR=$(mktemp -d)
 trap 'rm -rf "$WORKDIR"' EXIT
-
-gh repo clone "${OWNER}/${TAP_REPO}" "$WORKDIR"
 cd "$WORKDIR"
+
+if gh repo view "${OWNER}/${TAP_REPO}" &>/dev/null; then
+    echo "Repo ${OWNER}/${TAP_REPO} already exists, cloning."
+    git clone "git@github.com:${OWNER}/${TAP_REPO}.git" .
+else
+    echo "Creating ${OWNER}/${TAP_REPO}..."
+    gh repo create "${OWNER}/${TAP_REPO}" --public \
+        --description "Homebrew tap for ${BINARY_NAME}" \
+        --clone
+    cd "${TAP_REPO}"
+fi
+
+# -- Populate and push --
 
 mkdir -p Formula
 
