@@ -105,6 +105,11 @@ tag annotation before deleting and recreating?
 **Pre-commit hook**: Does an `install-hooks` recipe exist in the justfile?
 Does `.git/hooks/pre-commit` exist?
 
+**Apple code signing** (macOS apps only): Run the keychain probes from
+`references/apple-signing.md`. Report which signing prerequisites are
+present and which are missing. This determines whether the seed script
+is generated alongside the push script, or just the push script alone.
+
 **CLAUDE.md**: Does the project's CLAUDE.md mention CI commands, testing
 workflow (red/green), or `just check`?
 
@@ -148,8 +153,9 @@ For each selected item, read the corresponding reference file from
 2. **CI workflow** (read `references/ci.md`) -- uses `just check`
 3. **Release workflow** (read `references/release.md`) -- uses tag trigger
 4. **Homebrew** (read `references/homebrew.md`) -- setup script + release integration
-5. **Bump + retag** (read `references/bump.md`) -- creates tags that trigger release
-6. **Pre-commit hook** (read `references/pre-commit.md`) -- runs `just check`
+5. **Apple signing** (read `references/apple-signing.md`) -- macOS apps only
+6. **Bump + retag** (read `references/bump.md`) -- creates tags that trigger release
+7. **Pre-commit hook** (read `references/pre-commit.md`) -- runs `just check`
 
 ### Generation Rules
 
@@ -275,6 +281,7 @@ placeholders.
 - `references/ci.md` -- GitHub Actions CI workflow templates
 - `references/release.md` -- GitHub Actions release workflow templates
 - `references/homebrew.md` -- Homebrew formula/cask templates, setup script, release integration
+- `references/apple-signing.md` -- Apple code signing keychain probe, seed script, push script (macOS apps)
 - `references/bump.md` -- Bump and retag Justfile recipe templates
 - `references/pre-commit.md` -- install-hooks recipe
 
@@ -291,7 +298,9 @@ placeholders.
   output, caches inside the project), never global or user-level directories.
 - No secrets are stored in generated files. All secrets (HOMEBREW_TAP_TOKEN,
   APPLE_CERTIFICATE, etc.) live in GitHub's encrypted secrets and are
-  referenced only by name in workflow YAML.
+  referenced only by name in workflow YAML. For macOS apps, the Apple
+  signing secrets are provisioned from the local keychain via
+  `scripts/push-apple-secrets.sh` (see `references/apple-signing.md`).
 - Bump and retag always take bare version numbers. The recipe adds the tag
   prefix. This is normalized across all languages.
 - When upgrading partial infrastructure, preserve existing functionality.
