@@ -118,19 +118,39 @@ The output shape (total under 100 lines):
 
 How to fill it:
 
+**One rule applies to every section that shows a command: if a task runner recipe exists for that command, show only the recipe.** Never pair it with the raw toolchain command as an alternative, fallback, or trailing comment. The raw command does not appear anywhere in the file when a recipe exists. This rule overrides the natural tendency to be "helpful" by showing both.
+
+Wrong:
+
+```
+bun install          # or: just install
+npm test             (alternative: just test)
+```
+
+Right:
+
+```
+just install
+just test
+```
+
 - **Project summary.** 2-3 sentences. What it is and what it does. No marketing.
 - **Stack.** From the manifest. Mark the task runner as authoritative if there is one.
-- **Common commands.** Use the task runner's actual recipe names. Drop rows the project has no recipe for; do not invent one to fill the line, and do not substitute raw-toolchain commands when the task runner simply does not define them. If no task runner exists, fall back to raw toolchain for what actually exists.
+- **Common commands.** Use the task runner's actual recipe names. Drop rows the project has no recipe for; do not invent one to fill the line. If no task runner exists, fall back to raw toolchain for what actually exists.
 - **Architecture.** 2-4 sentences on the pieces and how they talk. Omit if `docs/architecture.md` covers it.
 - **Key paths.** Each entry answers "where does X live?". Skip paths a newcomer can find with `ls`.
 - **How to run.** Omit if the project is not a runnable app (library, plugin distribution, config repo).
-- **Dig deeper.** Links to further reading: `docs/*.md` overflow created in Step 3, design specs, adjacent skills, architecture diagrams. Omit the section when there is nothing worth linking.
+- **Dig deeper.** Links to further reading: existing top-level docs (README.md, TESTING.md, CONTRIBUTING.md, `adr/`), `docs/*.md` overflow created in Step 3, design specs, adjacent skills, architecture diagrams. Omit the section when there is nothing worth linking.
 
 Drop any section whose content would be empty or forced. Do not add sections beyond the shape above. One fact per line. No preamble, emojis, em dashes, or hyperbole.
 
 ## Step 3: Complexity check
 
-If the draft is over 100 lines, or any section is sprawling, extract to `docs/`:
+If the draft is over 100 lines, or any section is sprawling, find a home for the overflow.
+
+Check existing docs first. If the project already has a top-level doc that covers the topic (README.md, TESTING.md, DESKTOP-APP.md, CONTRIBUTING.md, `adr/*.md`, etc.), link it from `Dig deeper` rather than creating a parallel `docs/*.md`. Do not fragment documentation by duplicating what existing docs already say.
+
+Only when no existing doc covers the topic, create a new overflow file under `docs/`:
 
 | Topic | File |
 |-------|------|
