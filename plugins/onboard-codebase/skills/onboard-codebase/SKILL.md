@@ -13,7 +13,7 @@ orientation facts, loaded on demand.
 
 - `ONBOARDING.md` at repo root, **100 lines max**.
 - Overflow to `docs/*.md` when a topic needs more than ~15 lines. Link to them from a `## Dig deeper` section at the bottom of ONBOARDING.md.
-- CLAUDE.md gets a one-line pointer to ONBOARDING.md. Create a minimal CLAUDE.md if none exists. Never `@`-include ONBOARDING.md -- the whole point is on-demand loading.
+- CLAUDE.md gets a one-line markdown link to ONBOARDING.md, not its content. Create a minimal CLAUDE.md if none exists.
 
 ## Workflow
 
@@ -82,52 +82,51 @@ If the survey is ambiguous (no test framework, two conflicting ones, README refe
 
 ## Step 2: Synthesize
 
-Template. Drop sections that don't apply. Total under 100 lines.
+The output shape (total under 100 lines):
 
 ```markdown
 # Onboarding
 
-<2-3 sentences: what this project is and what it does>
+<summary paragraph>
 
 ## Stack
-
-- Language: <language and version>
-- Frameworks: <major frameworks / libraries>
-- Build: <tool, e.g. cargo, bun, uv>
-- Task runner: <justfile / Makefile / npm scripts> (authoritative)
+- Language:
+- Frameworks:
+- Build:
+- Task runner:
 
 ## Common commands
-
-Use the task runner's actual recipe names. Drop rows the project does not have; do not invent a recipe just to fill the line.
-
-- Build:     `<recipe>`
-- Test:      `<recipe>`
-- Lint:      `<recipe>`
-- Typecheck: `<recipe>`
-- Format:    `<recipe>`
-- Run:       `<recipe>`
+- Build:
+- Test:
+- Lint:
+- Typecheck:
+- Format:
+- Run:
 
 ## Architecture
-
-<2-4 sentences: the pieces and how they talk. Omit if docs/architecture.md covers it.>
+<architecture paragraph>
 
 ## Key paths
-
-- `src/main.rs` -- entry point
-- `src/lib.rs`  -- public API
-- `Cargo.toml`  -- manifest and dependencies
-- `tests/`      -- integration tests
-- `.github/workflows/` -- CI
-- `justfile`    -- task recipes
+- <path> -- <one-line role>
 
 ## How to run
+<one or two commands>
 
-<one or two commands that get it running locally>
+## Dig deeper
+- <path> -- <one-line role>
 ```
 
-(Add a `## Dig deeper` section only if Step 3 created `docs/*.md` overflow files. Don't include it by default.)
+How to fill it:
 
-One fact per line. Every path listed should answer "where does X live?". No preamble, no emojis, no em dashes, no hyperbole.
+- **Project summary.** 2-3 sentences. What it is and what it does. No marketing.
+- **Stack.** From the manifest. Mark the task runner as authoritative if there is one.
+- **Common commands.** Use the task runner's actual recipe names. Drop rows the project has no recipe for; do not invent one to fill the line, and do not substitute raw-toolchain commands when the task runner simply does not define them. If no task runner exists, fall back to raw toolchain for what actually exists.
+- **Architecture.** 2-4 sentences on the pieces and how they talk. Omit if `docs/architecture.md` covers it.
+- **Key paths.** Each entry answers "where does X live?". Skip paths a newcomer can find with `ls`.
+- **How to run.** Omit if the project is not a runnable app (library, plugin distribution, config repo).
+- **Dig deeper.** Links to further reading: `docs/*.md` overflow created in Step 3, design specs, adjacent skills, architecture diagrams. Omit the section when there is nothing worth linking.
+
+Drop any section whose content would be empty or forced. Do not add sections beyond the shape above. One fact per line. No preamble, emojis, em dashes, or hyperbole.
 
 ## Step 3: Complexity check
 
@@ -142,30 +141,29 @@ If the draft is over 100 lines, or any section is sprawling, extract to `docs/`:
 | Database schema | `docs/schema.md` |
 | API surface | `docs/api.md` |
 
-ONBOARDING.md is an index, not a textbook. When you create overflow files, add a `## Dig deeper` section at the bottom of ONBOARDING.md listing them with a one-line description each.
+ONBOARDING.md is an index, not a textbook. Link any overflow files from the `Dig deeper` section.
 
 ## Step 4: Reconcile with CLAUDE.md
 
-**Use a plain markdown link, not `@`-include.** The whole point of this skill is that ONBOARDING.md loads on demand. If CLAUDE.md `@`-includes it, it gets injected into every turn and the design is defeated. Never write `@ONBOARDING.md`. The pointer text that goes into CLAUDE.md is just:
+The pointer text that goes into CLAUDE.md is one line:
 
 ```markdown
 For project orientation (stack, build/test commands, architecture, entry points), see [ONBOARDING.md](./ONBOARDING.md).
 ```
 
-Do not add "read on demand" or "do not @-include" to CLAUDE.md itself -- those are instructions for you, not for the file.
-
 ### If CLAUDE.md exists
 
-1. Add the pointer line near the top if it is not already there.
-2. Scan CLAUDE.md for orientation facts that now live in ONBOARDING.md -- sections like "Structure", "Build", "Architecture", "Adding a ...", stack descriptions, command references, key path lists. These belong in ONBOARDING.md, not in both files.
-3. Propose an edit that strips those sections from CLAUDE.md, leaving only evergreen rules (policies, conventions like "always use uv", style rules) and the pointer.
-4. Show the full diff of both files before writing so the user can approve or reject the CLAUDE.md cleanup.
+1. Add the pointer near the top if it is not already there.
+2. Check headings. Any CLAUDE.md section whose heading or content overlaps a section you drafted in ONBOARDING.md (Stack, Structure, Build, Architecture, Key paths, Adding a ..., command references, stack descriptions) is orientation, not rule.
+3. Move that content: fold it into the matching ONBOARDING.md section so nothing is lost, then delete it from CLAUDE.md.
+4. What stays in CLAUDE.md: evergreen rules only -- policies, style constraints, architectural principles. Nothing that describes what the project IS or HOW to operate it.
+5. Show the full diff of both files before writing. "Left it alone because it felt evergreen" is not an acceptable outcome -- if you are unsure whether a section is fact or rule, surface the diff and ask.
 
 ### If CLAUDE.md does not exist
 
-Create a minimal one: a `# <project-name>` title and the pointer line. Nothing else.
+Create one with a `# <project-name>` title and the pointer line. Nothing else.
 
-CLAUDE.md is for evergreen rules that apply to every question; ONBOARDING.md is reference material pulled in only when orienting. Each fact should live in exactly one place.
+Each fact should live in exactly one file.
 
 ## Refreshing an existing ONBOARDING.md
 
