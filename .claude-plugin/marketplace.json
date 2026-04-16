@@ -21,6 +21,22 @@
         "retag",
         "pre-commit"
       ]
+    },
+    {
+      "name": "onboard-codebase",
+      "source": "./plugins/onboard-codebase",
+      "description": "Survey an unfamiliar codebase and generate a concise ONBOARDING.md (under 100 lines) covering language, frameworks, build/test/lint commands, high-level architecture, entry points, and CI/CD. Links from CLAUDE.md without @-including, so orientation loads on demand.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Ted Naleid"
+      },
+      "keywords": [
+        "onboarding",
+        "codebase",
+        "survey",
+        "orientation",
+        "documentation"
+      ]
     }
   ]
 }
