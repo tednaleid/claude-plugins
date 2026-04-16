@@ -12,13 +12,13 @@ orientation facts, loaded on demand.
 ## Output
 
 - `ONBOARDING.md` at repo root, **100 lines max**.
-- Overflow to `docs/*.md` when a topic needs more than ~15 lines. Link from "Dig deeper".
+- Overflow to `docs/*.md` when a topic needs more than ~15 lines. Link to them from a `## Dig deeper` section at the bottom of ONBOARDING.md.
 - CLAUDE.md gets a one-line pointer to ONBOARDING.md. Create a minimal CLAUDE.md if none exists. Never `@`-include ONBOARDING.md -- the whole point is on-demand loading.
 
 ## Workflow
 
 ```
-SURVEY --> SYNTHESIZE --> CHECK LENGTH --> WRITE --> LINK FROM CLAUDE.md
+SURVEY --> SYNTHESIZE --> CHECK LENGTH --> WRITE --> RECONCILE CLAUDE.md
 ```
 
 ## Step 1: Survey
@@ -98,14 +98,14 @@ Template. Drop sections that don't apply. Total under 100 lines.
 
 ## Common commands
 
-Prefer the task runner. Raw toolchain only when none exists.
+Use the task runner's actual recipe names. Drop rows the project does not have; do not invent a recipe just to fill the line.
 
-- Build:     `just build`
-- Test:      `just test`
-- Lint:      `just lint`
-- Typecheck: `just check`
-- Format:    `just fmt`
-- Run:       `just run`
+- Build:     `<recipe>`
+- Test:      `<recipe>`
+- Lint:      `<recipe>`
+- Typecheck: `<recipe>`
+- Format:    `<recipe>`
+- Run:       `<recipe>`
 
 ## Architecture
 
@@ -123,12 +123,9 @@ Prefer the task runner. Raw toolchain only when none exists.
 ## How to run
 
 <one or two commands that get it running locally>
-
-## Dig deeper
-
-- `docs/architecture.md` -- module graph
-- `docs/data-flow.md`    -- request lifecycle
 ```
+
+(Add a `## Dig deeper` section only if Step 3 created `docs/*.md` overflow files. Don't include it by default.)
 
 One fact per line. Every path listed should answer "where does X live?". No preamble, no emojis, no em dashes, no hyperbole.
 
@@ -145,19 +142,30 @@ If the draft is over 100 lines, or any section is sprawling, extract to `docs/`:
 | Database schema | `docs/schema.md` |
 | API surface | `docs/api.md` |
 
-ONBOARDING.md is an index, not a textbook.
+ONBOARDING.md is an index, not a textbook. When you create overflow files, add a `## Dig deeper` section at the bottom of ONBOARDING.md listing them with a one-line description each.
 
-## Step 4: Link from CLAUDE.md
+## Step 4: Reconcile with CLAUDE.md
 
-If CLAUDE.md exists, add this line near the top (if not already present):
+**Use a plain markdown link, not `@`-include.** The whole point of this skill is that ONBOARDING.md loads on demand. If CLAUDE.md `@`-includes it, it gets injected into every turn and the design is defeated. Never write `@ONBOARDING.md`. The pointer text that goes into CLAUDE.md is just:
 
 ```markdown
-For project orientation (stack, build/test commands, architecture, entry points), see [ONBOARDING.md](./ONBOARDING.md). Read on demand; do not `@`-include.
+For project orientation (stack, build/test commands, architecture, entry points), see [ONBOARDING.md](./ONBOARDING.md).
 ```
 
-If CLAUDE.md does not exist, create a minimal one with a title and that line.
+Do not add "read on demand" or "do not @-include" to CLAUDE.md itself -- those are instructions for you, not for the file.
 
-Never inline ONBOARDING.md into CLAUDE.md, and never `@`-include it. CLAUDE.md is for evergreen rules that apply to every question; ONBOARDING.md is reference material pulled in only when orienting.
+### If CLAUDE.md exists
+
+1. Add the pointer line near the top if it is not already there.
+2. Scan CLAUDE.md for orientation facts that now live in ONBOARDING.md -- sections like "Structure", "Build", "Architecture", "Adding a ...", stack descriptions, command references, key path lists. These belong in ONBOARDING.md, not in both files.
+3. Propose an edit that strips those sections from CLAUDE.md, leaving only evergreen rules (policies, conventions like "always use uv", style rules) and the pointer.
+4. Show the full diff of both files before writing so the user can approve or reject the CLAUDE.md cleanup.
+
+### If CLAUDE.md does not exist
+
+Create a minimal one: a `# <project-name>` title and the pointer line. Nothing else.
+
+CLAUDE.md is for evergreen rules that apply to every question; ONBOARDING.md is reference material pulled in only when orienting. Each fact should live in exactly one place.
 
 ## Refreshing an existing ONBOARDING.md
 
@@ -173,3 +181,4 @@ Never inline ONBOARDING.md into CLAUDE.md, and never `@`-include it. CLAUDE.md i
 - **Padding.** 60 good lines beat 100 mediocre ones.
 - **Duplicating CLAUDE.md.** Rules (like "always use uv") belong in CLAUDE.md; facts in ONBOARDING.md.
 - **Drift.** When refreshing, fix stale commands and paths. Do not preserve broken content.
+- **Inventing how-to sections.** Stick to the template. ONBOARDING.md answers "what is this" and "where do things live", not "how do I do X". Release procedures, contribution steps, and task-specific guides are docs, not orientation.
