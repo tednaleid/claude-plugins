@@ -177,7 +177,7 @@ For project orientation (stack, build/test commands, architecture, entry points)
 2. Check headings. Any CLAUDE.md section whose heading or content overlaps a section you drafted in ONBOARDING.md (Stack, Structure, Build, Architecture, Key paths, Adding a ..., command references, stack descriptions) is orientation, not rule.
 3. Move that content: fold it into the matching ONBOARDING.md section so nothing is lost, then delete it from CLAUDE.md.
 4. What stays in CLAUDE.md: evergreen rules only -- policies, style constraints, architectural principles. Nothing that describes what the project IS or HOW to operate it.
-5. Show the full diff of both files before writing. "Left it alone because it felt evergreen" is not an acceptable outcome -- if you are unsure whether a section is fact or rule, surface the diff and ask.
+5. Reconcile first, write second. "Left it alone because it felt evergreen" is not an acceptable outcome. When a section is borderline, make your best call based on rules 2-4; git diff is the user's review channel. After writing, briefly summarize what moved and what stayed.
 
 ### If CLAUDE.md does not exist
 
