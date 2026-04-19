@@ -1,6 +1,6 @@
 {
   "name": "context-relay",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Serialize a long Claude Code session's working state into a relay doc, then iteratively refine it by consulting a fresh-context reviewer subagent until the baton is passable. Ends with a copy-paste resume prompt for a brand-new Claude instance.",
   "author": {
     "name": "Ted Naleid"
