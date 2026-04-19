@@ -5,6 +5,24 @@
   },
   "plugins": [
     {
+      "name": "context-relay",
+      "source": "./plugins/context-relay",
+      "description": "Serialize a long Claude Code session's working state into a relay doc, then iteratively refine it by consulting a fresh-context reviewer subagent until the baton is passable. Ends with a copy-paste resume prompt for a brand-new Claude instance.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Ted Naleid"
+      },
+      "keywords": [
+        "handoff",
+        "relay",
+        "context",
+        "session",
+        "checkpoint",
+        "resume",
+        "compaction"
+      ]
+    },
+    {
       "name": "just-bootstrap",
       "source": "./plugins/just-bootstrap",
       "description": "Audit and set up CI, release, Justfile, and Homebrew infrastructure for any repo. Detects language automatically and generates normalized build/release tooling.",
