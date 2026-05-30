@@ -55,6 +55,46 @@
         "orientation",
         "documentation"
       ]
+    },
+    {
+      "name": "review-branch",
+      "source": "./plugins/review-branch",
+      "description": "Deep multi-lens review of an MR, PR, or any local branch. Dispatches 4 parallel subagents (architecture, security, test coverage, naming/API) inside an isolated worktree, aggregates findings with severity tags, and writes a dark-themed HTML disposition tracker (with checkboxes and localStorage) plus copy-paste comment drafts to .llm/reviews/. Nothing auto-posts; the human reviews and posts by hand. Works against GitLab (glab) and GitHub (gh); auto-detects from the git remote.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Ted Naleid"
+      },
+      "keywords": [
+        "code-review",
+        "mr",
+        "pr",
+        "merge-request",
+        "pull-request",
+        "gitlab",
+        "github",
+        "glab",
+        "gh",
+        "hexagonal",
+        "review-swarm"
+      ]
+    },
+    {
+      "name": "worktree",
+      "source": "./plugins/worktree",
+      "description": "Create an isolated git worktree under .claude/worktrees/ for reviewing an MR/PR or working on a branch. Resolves the source branch from an MR number, URL, or branch name, copies gitignored env files (.env, .envrc) from the main worktree, bootstraps with direnv/uv/bun/npm/pnpm, and switches the session into the new worktree.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Ted Naleid"
+      },
+      "keywords": [
+        "worktree",
+        "git",
+        "mr",
+        "pr",
+        "review",
+        "branch",
+        "isolation"
+      ]
     }
   ]
 }
