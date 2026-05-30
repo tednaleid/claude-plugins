@@ -1,0 +1,17 @@
+{
+  "name": "worktree",
+  "version": "0.1.0",
+  "description": "Create an isolated git worktree under .claude/worktrees/ for reviewing an MR/PR or working on a branch. Resolves the source branch from an MR number, URL, or branch name, copies gitignored env files (.env, .envrc) from the main worktree, bootstraps with direnv/uv/bun/npm/pnpm, and switches the session into the new worktree.",
+  "author": {
+    "name": "Ted Naleid"
+  },
+  "keywords": [
+    "worktree",
+    "git",
+    "mr",
+    "pr",
+    "review",
+    "branch",
+    "isolation"
+  ]
+}
