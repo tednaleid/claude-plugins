@@ -1,0 +1,21 @@
+{
+  "name": "review-branch",
+  "version": "0.1.0",
+  "description": "Deep multi-lens review of an MR, PR, or any local branch. Dispatches 4 parallel subagents (architecture, security, test coverage, naming/API) inside an isolated worktree, aggregates findings with severity tags, and writes a dark-themed HTML disposition tracker (with checkboxes and localStorage) plus copy-paste comment drafts to .llm/reviews/. Nothing auto-posts; the human reviews and posts by hand. Works against GitLab (glab) and GitHub (gh); auto-detects from the git remote.",
+  "author": {
+    "name": "Ted Naleid"
+  },
+  "keywords": [
+    "code-review",
+    "mr",
+    "pr",
+    "merge-request",
+    "pull-request",
+    "gitlab",
+    "github",
+    "glab",
+    "gh",
+    "hexagonal",
+    "review-swarm"
+  ]
+}

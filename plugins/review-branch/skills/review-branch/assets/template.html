@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>{{TITLE}}</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161922;
+    --panel2: #1c2030;
+    --border: #2a3042;
+    --text: #e6e8ee;
+    --muted: #9aa3b2;
+    --accent: #7aa2f7;
+    --red: #f7768e;
+    --amber: #e0af68;
+    --green: #9ece6a;
+    --blue: #7dcfff;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  h2 { margin: 32px 0 10px; font-size: 17px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  h3 { margin: 22px 0 8px; font-size: 14px; color: var(--accent); }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  .meta { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 12px; margin: 6px 0 22px; }
+  .meta strong { color: var(--text); font-weight: 500; }
+  a { color: var(--accent); }
+  code, pre { font-family: var(--mono); font-size: 12.5px; }
+  pre { background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; padding: 12px; overflow-x: auto; margin: 8px 0; }
+  code { background: var(--panel2); padding: 1px 5px; border-radius: 3px; }
+  pre code { background: transparent; padding: 0; }
+  .finding { background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--muted); border-radius: 6px; padding: 14px 16px; margin: 14px 0; }
+  .finding.high { border-left-color: var(--red); }
+  .finding.med  { border-left-color: var(--amber); }
+  .finding.low  { border-left-color: var(--blue); }
+  .finding.info { border-left-color: var(--green); }
+  .finding .head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 4px; flex-wrap: wrap; }
+  .finding .num { color: var(--muted); font-family: var(--mono); font-size: 12px; min-width: 28px; }
+  .finding .title { font-weight: 600; font-size: 14.5px; }
+  .badge { font-family: var(--mono); font-size: 10.5px; padding: 1px 7px; border-radius: 10px; text-transform: uppercase; letter-spacing: .04em; }
+  .badge.high { background: rgba(247,118,142,.15); color: var(--red); }
+  .badge.med  { background: rgba(224,175,104,.15); color: var(--amber); }
+  .badge.low  { background: rgba(125,207,255,.15); color: var(--blue); }
+  .badge.info { background: rgba(158,206,106,.15); color: var(--green); }
+  .file { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .small { color: var(--muted); font-size: 12.5px; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; }
+  th, td { text-align: left; border-bottom: 1px solid var(--border); padding: 8px 10px; vertical-align: top; font-size: 13px; }
+  th { color: var(--muted); font-weight: 500; }
+  ul { padding-left: 20px; margin: 6px 0; }
+  li + li { margin-top: 4px; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--panel2); border: 1px solid var(--border); color: var(--muted); margin-right: 4px; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin: 12px 0 20px; }
+  .summary-grid .card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+  .summary-grid .num { font-size: 22px; font-weight: 600; }
+  .summary-grid .label { color: var(--muted); font-size: 12px; }
+  .num.high { color: var(--red); }
+  .num.med  { color: var(--amber); }
+  .num.low  { color: var(--blue); }
+  .num.info { color: var(--green); }
+
+  /* Checkbox controls */
+  .chk { appearance: none; -webkit-appearance: none; width: 16px; height: 16px;
+         border: 1.5px solid var(--muted); border-radius: 3px; background: var(--panel2);
+         cursor: pointer; position: relative; flex-shrink: 0; margin: 0;
+         transition: background .12s, border-color .12s; vertical-align: middle; }
+  .chk:hover { border-color: var(--accent); }
+  .chk:checked { background: var(--green); border-color: var(--green); }
+  .chk:checked::after { content: ""; position: absolute; left: 4px; top: 1px;
+                        width: 4px; height: 8px; border: solid var(--bg);
+                        border-width: 0 2px 2px 0; transform: rotate(45deg); }
+
+  .finding.done { opacity: .45; }
+  .finding.done .title { text-decoration: line-through; text-decoration-color: var(--muted); }
+
+  .comment-block { margin: 14px 0; }
+  .comment-block .comment-head { display: flex; gap: 10px; align-items: center; margin: 0 0 6px; }
+  .comment-block .comment-head h3 { margin: 0; }
+  .comment-block.done { opacity: .45; }
+  .comment-block.done h3 { text-decoration: line-through; text-decoration-color: var(--muted); }
+
+  .controls { display: flex; gap: 10px; align-items: center; margin: 8px 0 18px; font-size: 12px; color: var(--muted); }
+  .controls button { background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+                     border-radius: 4px; padding: 4px 10px; font: inherit; cursor: pointer; }
+  .controls button:hover { border-color: var(--accent); color: var(--accent); }
+  .progress { font-family: var(--mono); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>{{TITLE}}</h1>
+<div class="sub">{{SUBTITLE}}</div>
+
+<div class="meta">
+{{META_ROW}}
+</div>
+
+<div class="summary-grid">
+{{SUMMARY_GRID}}
+</div>
+
+<div class="controls">
+  <span class="progress" id="progress">0 / 0 checked</span>
+  <button type="button" id="reset-btn">Reset all</button>
+</div>
+
+<h2>Overall</h2>
+{{OVERALL_BODY}}
+
+<h2>Findings</h2>
+{{FINDINGS_BODY}}
+
+{{HEX_TABLE_BLOCK}}
+
+{{COVERAGE_TABLE_BLOCK}}
+
+{{FILES_TABLE_BLOCK}}
+
+<h2>Suggested comments (drafts)</h2>
+<p class="small">Pick the ones you want. Kept short and concrete so you can paste with light editing.</p>
+{{COMMENTS_BLOCK}}
+
+</div>
+<script>
+(function () {
+  var KEY = '{{LOCAL_STORAGE_KEY}}';
+  var saved;
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}'); }
+  catch (e) { saved = {}; }
+
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.chk'));
+  var progress = document.getElementById('progress');
+
+  function applyDoneStyle(box) {
+    var finding = box.closest('.finding');
+    if (finding) finding.classList.toggle('done', box.checked);
+    var comment = box.closest('.comment-block');
+    if (comment) comment.classList.toggle('done', box.checked);
+  }
+
+  function updateProgress() {
+    var checked = boxes.filter(function (b) { return b.checked; }).length;
+    progress.textContent = checked + ' / ' + boxes.length + ' checked';
+  }
+
+  boxes.forEach(function (box) {
+    var id = box.dataset.id;
+    if (saved[id]) box.checked = true;
+    applyDoneStyle(box);
+    box.addEventListener('change', function () {
+      saved[id] = box.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+      applyDoneStyle(box);
+      updateProgress();
+    });
+  });
+
+  document.getElementById('reset-btn').addEventListener('click', function () {
+    if (!confirm('Clear all checkmarks?')) return;
+    boxes.forEach(function (box) { box.checked = false; applyDoneStyle(box); });
+    saved = {};
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    updateProgress();
+  });
+
+  updateProgress();
+})();
+</script>
+</body>
+</html>
