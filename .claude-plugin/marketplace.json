@@ -26,7 +26,7 @@
       "name": "just-bootstrap",
       "source": "./plugins/just-bootstrap",
       "description": "Audit and set up CI, release, Justfile, and Homebrew infrastructure for any repo. Detects language automatically and generates normalized build/release tooling.",
-      "version": "0.1.8",
+      "version": "0.1.9",
       "author": {
         "name": "Ted Naleid"
       },
