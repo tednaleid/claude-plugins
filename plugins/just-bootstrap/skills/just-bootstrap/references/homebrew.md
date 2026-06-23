@@ -101,7 +101,7 @@ cask "{REPO}" do
   desc "{DESC}"
   homepage "https://github.com/{OWNER}/{REPO}"
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "{APP_NAME}.app"
 
@@ -116,6 +116,7 @@ end
 **Notes:**
 - Cask name is lowercase (e.g., `montty`)
 - The `depends_on macos` version should match the project's deployment target
+- Use the bare symbol form (`depends_on macos: :sonoma`), not the string comparison form (`depends_on macos: ">= :sonoma"`). A bare OS symbol already means "that version or newer", and the `">= :symbol"` form is deprecated -- it emits a Homebrew deprecation warning on every operation that touches the cask
 - `zap trash` paths should list the app's data, preferences, and cache locations
 - The DMG URL must match the release workflow's output filename
 - Adjust `#{version}` to `v#{version}` if using v-prefixed tags
@@ -367,7 +368,7 @@ DMG to GitHub release) to update the Homebrew cask.
             desc "{DESC}"
             homepage "https://github.com/{OWNER}/{REPO}"
 
-            depends_on macos: ">= :sonoma"
+            depends_on macos: :sonoma
 
             app "{APP_NAME}.app"
 
