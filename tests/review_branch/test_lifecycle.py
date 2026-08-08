@@ -51,6 +51,13 @@ def test_stop_tolerates_stale_pidfile(env):
     assert not review_tool.pidfile().exists()
 
 
+def test_stop_tolerates_garbage_pidfile(env):
+    review_tool.state_root().mkdir(parents=True, exist_ok=True)
+    review_tool.pidfile().write_text("garbage")
+    assert review_tool.cmd_stop() == 0
+    assert not review_tool.pidfile().exists()
+
+
 def test_open_spawns_daemon_on_dead_port(env, monkeypatch, capsys):
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))

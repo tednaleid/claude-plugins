@@ -111,6 +111,38 @@ def test_bad_json_400(served):
     assert status == 400
 
 
+def test_non_dict_finding_entry_400_and_does_not_write(served):
+    port, d = served
+    state_path = d / "state.json"
+    before = state_path.read_text() if state_path.exists() else None
+    body = json.dumps({"findings": {"f1": "x"}})
+    status, data = request(port, "POST", "/proj-abcd/mr-7/round-1/api/state", body)
+    assert status == 400
+    after = state_path.read_text() if state_path.exists() else None
+    assert after == before
+
+
+def test_bad_origin_403_and_does_not_write(served):
+    port, d = served
+    state_path = d / "state.json"
+    before = state_path.read_text() if state_path.exists() else None
+    body = json.dumps({"findings": {"f1": {"disposition": "post"}}})
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    conn.request(
+        "POST",
+        "/proj-abcd/mr-7/round-1/api/state",
+        body=body,
+        headers={"Content-Type": "application/json", "Origin": "https://evil.example"},
+    )
+    resp = conn.getresponse()
+    status = resp.status
+    resp.read()
+    conn.close()
+    assert status == 403
+    after = state_path.read_text() if state_path.exists() else None
+    assert after == before
+
+
 def test_concurrent_posts_all_succeed(served):
     port, d = served
 
@@ -145,6 +177,19 @@ def test_index_skips_review_that_vanishes_mid_scan(env):
     (d / "review.toml").mkdir()
     page = review_tool.index_html(root)
     assert "no reviews yet" in page
+
+
+def test_index_skips_review_with_corrupt_state_json(env):
+    root = review_tool.data_root()
+    good = root / "proj-abcd" / "mr-1" / "round-1"
+    bad = root / "proj-abcd" / "mr-2" / "round-1"
+    for d, title in ((good, "Good Review"), (bad, "Bad Review")):
+        d.mkdir(parents=True)
+        (d / "review.toml").write_text(f'[review]\ntitle = "{title}"\n')
+    (bad / "state.json").write_text("{bad")
+    page = review_tool.index_html(root)
+    assert "Good Review" in page
+    assert "Bad Review" not in page
 
 
 def test_index_sorts_by_latest_activity(env):

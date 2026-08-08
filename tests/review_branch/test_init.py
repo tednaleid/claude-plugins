@@ -1,6 +1,8 @@
 # ABOUTME: tests for the init subcommand round-directory creation
 # ABOUTME: covers first round, round increment, and CLI stdout contract
 
+import pytest
+
 import review_tool
 from conftest import make_repo
 
@@ -19,6 +21,12 @@ def test_init_increments_rounds(env):
     review_tool.cmd_init("mr-124", repo)
     d2 = review_tool.cmd_init("mr-124", repo)
     assert d2.name == "round-2"
+
+
+def test_init_rejects_slug_that_escapes_a_path_segment(env):
+    repo = make_repo(env / "proj", origin="https://gitlab.example.com/g/proj.git")
+    with pytest.raises(SystemExit):
+        review_tool.cmd_init("../evil", repo)
 
 
 def test_init_cli_prints_path(env, capsys, monkeypatch):

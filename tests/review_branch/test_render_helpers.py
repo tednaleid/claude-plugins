@@ -12,6 +12,17 @@ def test_md_html_renders_inline_code():
     assert "<code>x</code>" in review_tool.md_html("has `x` in it")
 
 
+def test_md_html_escapes_raw_html():
+    rendered = review_tool.md_html("<script>alert(1)</script>")
+    assert "<script>" not in rendered
+    assert "&lt;script&gt;" in rendered
+
+
+def test_md_html_still_renders_table():
+    rendered = review_tool.md_html("| a | b |\n|---|---|\n| 1 | 2 |\n")
+    assert "<table>" in rendered
+
+
 def test_esc_escapes_angle_brackets_and_quotes():
     assert review_tool.esc('<a href="x">') == "&lt;a href=&quot;x&quot;&gt;"
 

@@ -94,6 +94,8 @@ def data_commit(message: str) -> None:
 
 
 def cmd_init(slug: str, repo_dir: Path) -> Path:
+    if not slug or slug in (".", "..") or "/" in slug or "\\" in slug or slug.startswith((".", "-")):
+        raise SystemExit(f"invalid slug {slug!r}: must be a single path segment")
     ensure_data_repo()
     base = data_root() / repo_id(repo_dir) / slug
     existing = []
@@ -179,7 +181,7 @@ def cmd_manifest(round_dir: Path, exclude: set[str]) -> list[dict]:
     return entries
 
 
-_MD = MarkdownIt("commonmark").enable("table")
+_MD = MarkdownIt("commonmark", {"html": False}).enable("table")
 
 
 def esc(s) -> str:
@@ -235,7 +237,7 @@ def meta_row(meta: dict) -> str:
     if label and meta.get("url") and meta.get("number"):
         mark = "!" if label == "MR" else "#"
         spans.append(
-            f'<span><strong>{label}:</strong> <a href="{esc(meta["url"])}">{mark}{meta["number"]}</a></span>'
+            f'<span><strong>{label}:</strong> <a href="{safe_href(meta["url"])}">{mark}{meta["number"]}</a></span>'
         )
     if meta.get("source_branch"):
         arrow = f'{esc(meta["source_branch"])} -&gt; {esc(meta.get("target_branch", ""))}'
@@ -264,6 +266,8 @@ def assets_html(round_dir: Path, review: dict) -> str:
     parts = []
     for a in review.get("assets", []):
         p = round_dir / a["path"]
+        if not p.resolve().is_relative_to(round_dir.resolve()):
+            raise SystemExit(f"asset {a['path']}: escapes the round directory")
         try:
             content = p.read_text()
         except OSError as e:
@@ -287,8 +291,16 @@ def _dash(value) -> str:
     return esc(value) if value else "&mdash;"
 
 
+def safe_href(url) -> str:
+    url = str(url or "")
+    if re.match(r"^https?://", url, re.IGNORECASE):
+        return url
+    return "#"
+
+
 def finding_card(f: dict, meta: dict) -> str:
     sev = f.get("severity", "info")
+    sev_class = sev if sev in ("high", "med", "low", "info") else "info"
     fid = f["id"]
     _, line = parse_anchor(f)
     fileref = f'{f["file"]}:{f["lines"]}' if f.get("lines") else f["file"]
@@ -297,13 +309,13 @@ def finding_card(f: dict, meta: dict) -> str:
     head = [
         f'<span class="num">{esc(fid)}</span>',
         f'<span class="title">{esc(f.get("title", ""))}</span>',
-        f'<span class="badge {sev}">{sev}</span>',
+        f'<span class="badge {sev_class}">{esc(sev)}</span>',
     ]
     head += [f'<span class="tag">{esc(lens)}</span>' for lens in f.get("lenses", [])]
     if f["posted"]:
-        head.append(f'<a class="badge posted" href="{esc(f.get("posted_url", ""))}">posted</a>')
+        head.append(f'<a class="badge posted" href="{safe_href(f.get("posted_url", ""))}">posted</a>')
     parts = [
-        f'<div class="finding {sev}" data-fid="{esc(fid)}" data-rev="{f.get("comment_rev", 1)}">',
+        f'<div class="finding {sev_class}" data-fid="{esc(fid)}" data-rev="{esc(f.get("comment_rev", 1))}">',
         f'<div class="head">{" ".join(head)}</div>',
         f'<div class="file">{file_html}</div>',
         md_html(f.get("body", "")),
@@ -656,9 +668,10 @@ def index_html(root: Path) -> str:
         d = toml_path.parent
         try:
             review = tomllib.loads(toml_path.read_text())
-        except (tomllib.TOMLDecodeError, OSError):
+            state = load_state(d)
+        except (tomllib.TOMLDecodeError, OSError, json.JSONDecodeError):
             continue
-        findings = merged_findings(review, load_state(d))
+        findings = merged_findings(review, state)
         counts: dict[str, int] = {}
         for f in findings:
             sev = f.get("severity", "info")
@@ -746,6 +759,15 @@ class ReviewHandler(BaseHTTPRequestHandler):
 
     def _handle_post(self):
         path = urlparse(self.path).path
+        host = self.headers.get("Host")
+        if host and host.split(":")[0] not in ("127.0.0.1", "localhost"):
+            return self._json(403, {"error": "bad host"})
+        origin = self.headers.get("Origin")
+        if origin:
+            port = current_port()
+            allowed_origins = {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
+            if origin not in allowed_origins:
+                return self._json(403, {"error": "bad origin"})
         if path == "/api/shutdown":
             threading.Thread(target=self.server.shutdown).start()
             return self._json(200, {"ok": True})
@@ -762,6 +784,8 @@ class ReviewHandler(BaseHTTPRequestHandler):
             return self._json(400, {"error": "invalid json"})
         if not isinstance(payload, dict) or not isinstance(payload.get("findings"), dict):
             return self._json(400, {"error": 'expected {"findings": {...}}'})
+        if not all(isinstance(v, dict) for v in payload["findings"].values()):
+            return self._json(400, {"error": "each finding entry must be an object"})
         try:
             with _STATE_WRITE_LOCK:
                 payload["updated_at"] = datetime.now(UTC).isoformat()
@@ -869,11 +893,16 @@ def cmd_stop() -> int:
     if not pf.exists():
         print("daemon not running (no pidfile)")
         return 0
-    pid = int(pf.read_text().strip())
+    try:
+        pid = int(pf.read_text().strip())
+    except ValueError:
+        print("removed stale pidfile (not a valid pid)")
+        pf.unlink(missing_ok=True)
+        return 0
     try:
         os.kill(pid, signal.SIGTERM)
         print(f"stopped daemon (pid {pid})")
-    except ProcessLookupError:
+    except (ProcessLookupError, PermissionError):
         print(f"removed stale pidfile (pid {pid} not running)")
     pf.unlink(missing_ok=True)
     return 0

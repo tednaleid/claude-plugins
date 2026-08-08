@@ -122,6 +122,52 @@ def test_summary_shows_med_zero_hides_low_zero(round_dir):
     assert '<div class="num info">1</div>' in page
 
 
+def test_malicious_severity_and_url_are_neutralized(env):
+    d = review_tool.data_root() / "proj-abcd" / "mr-13" / "round-1"
+    d.mkdir(parents=True)
+    (d / "review.toml").write_text(
+        '''
+[review]
+title = "Injection attempt"
+
+[[findings]]
+id = "f1"
+severity = 'x" onmouseover="y'
+title = "Bad severity"
+file = "a.py"
+lines = "1"
+body = "x"
+comment = "Draft."
+posted_url = "javascript:alert(1)"
+posted_at = "2026-08-08T00:00:00Z"
+posted_body = "final"
+'''
+    )
+    page = review_tool.render_html(d, served=True)
+    assert '<span class="badge x" onmouseover="y">' not in page
+    assert '<div class="finding x" onmouseover="y"' not in page
+    assert 'class="badge info"' in page
+    assert 'href="#">posted</a>' in page
+
+
+def test_asset_path_escaping_round_dir_raises(env):
+    d = review_tool.data_root() / "proj-abcd" / "mr-14" / "round-1"
+    d.mkdir(parents=True)
+    (d.parent / "secret.txt").write_text("shh")
+    (d / "review.toml").write_text(
+        '''
+[review]
+title = "Escaping asset"
+
+[[assets]]
+type = "html"
+path = "../secret.txt"
+'''
+    )
+    with pytest.raises(SystemExit):
+        review_tool.render_html(d, served=True)
+
+
 def test_unknown_severity_renders_without_raising(env):
     d = review_tool.data_root() / "proj-abcd" / "mr-9" / "round-1"
     d.mkdir(parents=True)
