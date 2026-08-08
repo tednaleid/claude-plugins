@@ -15,8 +15,12 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import tomllib
+from datetime import UTC, datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlparse
 
 from markdown_it import MarkdownIt
 
@@ -588,6 +592,139 @@ def cmd_render(round_dir: Path) -> Path:
     rid, slug, rnd = route_for(round_dir).split("/")
     data_commit(f"{rid} {slug} {rnd}: render")
     return out
+
+
+INDEX_TEMPLATE = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>review-branch</title>
+<style>
+  body { margin: 0; background: #0f1115; color: #e6e8ee;
+         font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 24px; }
+  a { color: #7aa2f7; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; border-bottom: 1px solid #2a3042; padding: 8px 10px; font-size: 13px; }
+  th { color: #9aa3b2; font-weight: 500; }
+</style>
+</head>
+<body><div class="wrap">
+<h1>Reviews</h1>
+<table><tr><th>Review</th><th>Repo</th><th>Findings</th><th>Progress</th></tr>
+<!--ROWS-->
+</table>
+</div></body></html>
+"""
+
+
+def index_html(root: Path) -> str:
+    rows = []
+    tomls = sorted(
+        root.glob("*/*/round-*/review.toml"), key=lambda p: p.stat().st_mtime, reverse=True
+    )
+    for toml_path in tomls:
+        d = toml_path.parent
+        try:
+            review = tomllib.loads(toml_path.read_text())
+        except tomllib.TOMLDecodeError:
+            continue
+        findings = merged_findings(review, load_state(d))
+        counts: dict[str, int] = {}
+        for f in findings:
+            sev = f.get("severity", "info")
+            counts[sev] = counts.get(sev, 0) + 1
+        sev_text = " ".join(f"{k}:{counts[k]}" for k in ("high", "med", "low", "info") if k in counts)
+        decided = sum(1 for f in findings if f["disposition"])
+        posted = sum(1 for f in findings if f["posted"])
+        route = "/".join(d.relative_to(root).parts)
+        title = review.get("review", {}).get("title", route)
+        rows.append(
+            f'<tr><td><a href="/{route}/">{esc(title)}</a></td><td>{esc(d.relative_to(root).parts[0])}</td>'
+            f"<td>{esc(sev_text)}</td><td>{decided} decided, {posted} posted</td></tr>"
+        )
+    return INDEX_TEMPLATE.replace("<!--ROWS-->", "\n".join(rows) or '<tr><td colspan="4">no reviews yet</td></tr>')
+
+
+class ReviewHandler(BaseHTTPRequestHandler):
+    root: Path
+
+    def log_message(self, fmt, *args):
+        pass
+
+    def _send(self, code: int, body: str, ctype: str = "text/html; charset=utf-8"):
+        data = body.encode()
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _json(self, code: int, obj):
+        self._send(code, json.dumps(obj), "application/json")
+
+    def _round_dir(self, parts: list[str]) -> Path | None:
+        if len(parts) != 3:
+            return None
+        d = (self.root / parts[0] / parts[1] / parts[2]).resolve()
+        if not d.is_relative_to(self.root.resolve()):
+            return None
+        return d if (d / "review.toml").exists() else None
+
+    def do_GET(self):
+        path = urlparse(self.path).path
+        if path == "/api/health":
+            return self._json(200, {"app": APP_NAME, "version": __version__, "data_root": str(self.root)})
+        if path == "/":
+            return self._send(200, index_html(self.root))
+        parts = [p for p in path.split("/") if p]
+        if len(parts) >= 2 and parts[-2] == "api":
+            d = self._round_dir(parts[:-2])
+            if d is None:
+                return self._json(404, {"error": "unknown review route"})
+            if parts[-1] == "state":
+                return self._json(200, load_state(d))
+            if parts[-1] == "version":
+                return self._json(200, {"token": version_token(d)})
+            return self._json(404, {"error": "unknown api endpoint"})
+        d = self._round_dir(parts)
+        if d is None:
+            return self._json(404, {"error": "unknown review route"})
+        if not path.endswith("/"):
+            self.send_response(301)
+            self.send_header("Location", path + "/")
+            self.end_headers()
+            return
+        return self._send(200, render_html(d, served=True))
+
+    def do_POST(self):
+        path = urlparse(self.path).path
+        if path == "/api/shutdown":
+            threading.Thread(target=self.server.shutdown).start()
+            return self._json(200, {"ok": True})
+        parts = [p for p in path.split("/") if p]
+        if len(parts) != 5 or parts[3:] != ["api", "state"]:
+            return self._json(404, {"error": "unknown endpoint"})
+        d = self._round_dir(parts[:3])
+        if d is None:
+            return self._json(404, {"error": "unknown review route"})
+        length = int(self.headers.get("Content-Length", 0))
+        try:
+            payload = json.loads(self.rfile.read(length))
+        except json.JSONDecodeError:
+            return self._json(400, {"error": "invalid json"})
+        if not isinstance(payload, dict) or not isinstance(payload.get("findings"), dict):
+            return self._json(400, {"error": 'expected {"findings": {...}}'})
+        payload["updated_at"] = datetime.now(UTC).isoformat()
+        (d / "state.json").write_text(json.dumps(payload, indent=2) + "\n")
+        (d / "review.html").write_text(render_html(d, served=False))
+        data_commit(f"{parts[0]} {parts[1]} {parts[2]}: state update")
+        return self._json(200, {"ok": True, "token": version_token(d)})
+
+
+def make_server(port: int, root: Path | None = None) -> ThreadingHTTPServer:
+    handler = type("BoundHandler", (ReviewHandler,), {"root": root or data_root()})
+    return ThreadingHTTPServer(("127.0.0.1", port), handler)
 
 
 def main(argv: list[str] | None = None) -> int:
