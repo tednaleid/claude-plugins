@@ -62,6 +62,23 @@ def repo_id(repo_dir: Path) -> str:
     return f"{root.name}-{digest}"
 
 
+def ensure_data_repo() -> Path:
+    root = data_root()
+    root.mkdir(parents=True, exist_ok=True)
+    if not (root / ".git").is_dir():
+        subprocess.run(["git", "init", "-q", str(root)], check=True, capture_output=True)
+        git(root, "config", "user.name", APP_NAME)
+        git(root, "config", "user.email", f"{APP_NAME}@localhost")
+    return root
+
+
+def data_commit(message: str) -> None:
+    root = ensure_data_repo()
+    git(root, "add", "-A")
+    if git(root, "status", "--porcelain"):
+        git(root, "commit", "-q", "-m", message)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="review-branch", description="review-branch tool")
     parser.add_argument("--version", action="version", version=__version__)
