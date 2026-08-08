@@ -9,9 +9,11 @@
 
 import argparse
 import hashlib
+import json
 import os
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 __version__ = "0.2.0"
@@ -90,6 +92,44 @@ def cmd_init(slug: str, repo_dir: Path) -> Path:
     round_dir = base / f"round-{max(existing, default=0) + 1}"
     round_dir.mkdir(parents=True)
     return round_dir.resolve()
+
+
+def load_review(round_dir: Path) -> dict:
+    path = round_dir / "review.toml"
+    try:
+        return tomllib.loads(path.read_text())
+    except (tomllib.TOMLDecodeError, OSError) as e:
+        raise SystemExit(f"{path}: {e}")
+
+
+def load_state(round_dir: Path) -> dict:
+    path = round_dir / "state.json"
+    if not path.exists():
+        return {"findings": {}}
+    return json.loads(path.read_text())
+
+
+def merged_findings(review: dict, state: dict) -> list[dict]:
+    out = []
+    entries = state.get("findings", {})
+    for f in review.get("findings", []):
+        s = entries.get(f["id"], {})
+        crev = f.get("comment_rev", 1)
+        edited = s.get("edited_comment")
+        edited_current = edited is not None and s.get("edited_comment_rev") == crev
+        note = s.get("note")
+        merged = dict(f)
+        merged.update(
+            disposition=s.get("disposition"),
+            note=note,
+            note_stale=note is not None and s.get("note_rev", 0) < crev,
+            edited_comment=edited,
+            edited_stale=edited is not None and not edited_current,
+            postable_body=edited if edited_current else f.get("comment"),
+            posted=bool(f.get("posted_url")),
+        )
+        out.append(merged)
+    return out
 
 
 def main(argv: list[str] | None = None) -> int:
