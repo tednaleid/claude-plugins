@@ -627,9 +627,15 @@ _STATE_WRITE_LOCK = threading.Lock()
 
 def index_html(root: Path) -> str:
     rows = []
-    tomls = sorted(
-        root.glob("*/*/round-*/review.toml"), key=lambda p: p.stat().st_mtime, reverse=True
-    )
+
+    def activity(p: Path) -> float:
+        state = p.parent / "state.json"
+        times = [p.stat().st_mtime]
+        if state.exists():
+            times.append(state.stat().st_mtime)
+        return max(times)
+
+    tomls = sorted(root.glob("*/*/round-*/review.toml"), key=activity, reverse=True)
     for toml_path in tomls:
         d = toml_path.parent
         try:

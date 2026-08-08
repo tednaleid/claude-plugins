@@ -15,9 +15,7 @@ writes valid review.toml gets the same HTML, daemon, and manifest behavior.
 - round-N: one directory per review round; a re-review is a new round, never an edit
 - `review-branch init --slug <slug>` (run inside the repo) creates the next round and prints its path
 
-The data root is a git repo; the tool auto-commits every write with messages
-shaped `<repo-id> <slug> round-N: <action>`. Comment rewrite history lives in
-this git history, not in the files.
+The data root is a git repo. Every write the tool itself performs (render, browser state saves) is auto-committed with messages shaped `<repo-id> <slug> round-N: <action>`. Writes made directly by the agent, such as review.toml edits, are swept into the next such commit; run `review-branch render` after editing review.toml so a comment rewrite lands in history.
 
 ## review.toml
 
@@ -93,14 +91,16 @@ everything else; never pre-escape content.
 
 ## Merge and staleness rules
 
-- A note or edit is stale when its rev is lower than the finding's
-  comment_rev (default 1). Stale entries are flagged, not applied.
+- A note is stale when its note_rev is lower than the finding's
+  comment_rev (default 1). An edit is current only when its
+  edited_comment_rev equals comment_rev; any other value is stale. Stale
+  entries are flagged, not applied.
 - Postable body: edited_comment when edited_comment_rev equals comment_rev,
   else comment.
 - When the agent rewrites a comment from a note it bumps comment_rev; the page
   then shows the consumed note as a dimmed "applied" annotation and resets the
   textarea to the new draft.
-- `review-branch status <round-dir>` prints the full merged view as JSON.
+- `review-branch status <round-dir>` prints the merged view as JSON (review metadata plus merged findings).
 - `review-branch manifest <round-dir> [--exclude f3,f7]` prints posting
   entries `[{"file", "line", "body"}]` for findings with disposition "post"
   that are commentable and not yet posted.

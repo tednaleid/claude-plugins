@@ -4,6 +4,7 @@
 import concurrent.futures
 import http.client
 import json
+import os
 import threading
 
 import pytest
@@ -125,3 +126,20 @@ def test_concurrent_posts_all_succeed(served):
     assert all(status == 200 for status, _ in results)
     saved = json.loads((d / "state.json").read_text())
     assert saved["findings"]["f1"]["note"].startswith("n")
+
+
+def test_index_sorts_by_latest_activity(env):
+    root = review_tool.data_root()
+    a = root / "proj-abcd" / "mr-1" / "round-1"
+    b = root / "proj-abcd" / "mr-2" / "round-1"
+    for d, title in ((a, "Review A"), (b, "Review B")):
+        d.mkdir(parents=True)
+        (d / "review.toml").write_text(f'[review]\ntitle = "{title}"\n')
+    os.utime(a / "review.toml", (1000, 1000))
+    os.utime(b / "review.toml", (2000, 2000))
+    page = review_tool.index_html(root)
+    assert page.index("Review B") < page.index("Review A")
+    (a / "state.json").write_text('{"findings": {}}')
+    os.utime(a / "state.json", (3000, 3000))
+    page = review_tool.index_html(root)
+    assert page.index("Review A") < page.index("Review B")
