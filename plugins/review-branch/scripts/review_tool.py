@@ -13,6 +13,7 @@ import html
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -838,6 +839,41 @@ def cmd_stop() -> int:
     return 0
 
 
+INSTALL_MAP = {
+    "review_tool.py": "review-branch",
+    "glab_comment.py": "glab-comment",
+    "gh_comment.py": "gh-comment",
+}
+
+
+def bin_dir() -> Path:
+    return Path(os.environ.get("REVIEW_BRANCH_BIN", "~/.local/bin")).expanduser()
+
+
+def install_scripts(src_dir: Path, dest_dir: Path) -> list[str]:
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    installed = []
+    for src_name, dest_name in INSTALL_MAP.items():
+        src = src_dir / src_name
+        if not src.exists():
+            continue
+        dest = dest_dir / dest_name
+        shutil.copy2(src, dest)
+        dest.chmod(0o755)
+        installed.append(dest_name)
+    return installed
+
+
+def cmd_install() -> int:
+    dest = bin_dir()
+    installed = install_scripts(Path(__file__).resolve().parent, dest)
+    for name in installed:
+        print(f"installed {dest / name}")
+    for name in sorted(set(INSTALL_MAP.values()) - set(installed)):
+        print(f"skipped {name} (source not present)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="review-branch", description="review-branch tool")
     parser.add_argument("--version", action="version", version=__version__)
@@ -873,6 +909,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "open":
         print(cmd_open(Path(args.review_dir)))
         return 0
+    if args.command == "install":
+        return cmd_install()
     if args.command == "daemon":
         return cmd_daemon()
     if args.command == "stop":
