@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tomllib
@@ -132,6 +133,41 @@ def merged_findings(review: dict, state: dict) -> list[dict]:
     return out
 
 
+def parse_anchor(finding: dict) -> tuple[str, int | None]:
+    anchor = finding.get("anchor")
+    if anchor and ":" in anchor:
+        path, _, line = anchor.rpartition(":")
+        if line.isdigit():
+            return path, int(line)
+    nums = re.findall(r"\d+", str(finding.get("lines", "")))
+    return finding["file"], int(nums[-1]) if nums else None
+
+
+def cmd_status(round_dir: Path) -> dict:
+    review = load_review(round_dir)
+    return {
+        "review": review.get("review", {}),
+        "findings": merged_findings(review, load_state(round_dir)),
+    }
+
+
+def cmd_manifest(round_dir: Path, exclude: set[str]) -> list[dict]:
+    entries = []
+    for f in merged_findings(load_review(round_dir), load_state(round_dir)):
+        if f["disposition"] != "post" or f["posted"] or f["id"] in exclude:
+            continue
+        if f.get("commentable", True) is False:
+            continue
+        path, line = parse_anchor(f)
+        body = f["postable_body"]
+        if line is None or not body:
+            raise SystemExit(
+                f"{f['id']}: cannot build manifest entry (line={line}, body empty={not body})"
+            )
+        entries.append({"file": path, "line": line, "body": body})
+    return entries
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="review-branch", description="review-branch tool")
     parser.add_argument("--version", action="version", version=__version__)
@@ -141,6 +177,8 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("render", "open", "status", "manifest"):
         p = sub.add_parser(name)
         p.add_argument("review_dir")
+    p_manifest = sub._name_parser_map["manifest"]
+    p_manifest.add_argument("--exclude", default="")
     sub.add_parser("install", help="copy scripts to the bin dir")
     sub.add_parser("daemon", help="run the server in the foreground")
     sub.add_parser("stop", help="stop the daemon via pidfile")
@@ -151,6 +189,13 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.command == "init":
         print(cmd_init(args.slug, Path.cwd()))
+        return 0
+    if args.command == "status":
+        print(json.dumps(cmd_status(Path(args.review_dir)), indent=2))
+        return 0
+    if args.command == "manifest":
+        exclude = {x for x in args.exclude.split(",") if x}
+        print(json.dumps(cmd_manifest(Path(args.review_dir), exclude), indent=2))
         return 0
     print(f"{args.command}: not implemented", file=sys.stderr)
     return 2
