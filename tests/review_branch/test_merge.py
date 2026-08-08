@@ -99,3 +99,30 @@ def test_bad_toml_exits_with_path_in_message(tmp_path):
     with pytest.raises(SystemExit) as exc:
         review_tool.load_review(d)
     assert "review.toml" in str(exc.value)
+
+
+def test_note_without_rev_is_stale(round_dir):
+    write_state(round_dir, {"f1": {"note": "soften"}})
+    f1 = review_tool.merged_findings(
+        review_tool.load_review(round_dir), review_tool.load_state(round_dir)
+    )[0]
+    assert f1["note_stale"] is True
+
+
+def test_edit_without_rev_is_stale(round_dir):
+    write_state(round_dir, {"f1": {"edited_comment": "Mine."}})
+    f1 = review_tool.merged_findings(
+        review_tool.load_review(round_dir), review_tool.load_state(round_dir)
+    )[0]
+    assert f1["edited_stale"] is True
+    assert f1["postable_body"] == "Draft one."
+
+
+def test_missing_comment_rev_defaults_to_one(round_dir):
+    # f2 in the fixture has no comment_rev; an edit at rev 1 is current for it
+    write_state(round_dir, {"f2": {"edited_comment": "Edited two.", "edited_comment_rev": 1}})
+    f2 = review_tool.merged_findings(
+        review_tool.load_review(round_dir), review_tool.load_state(round_dir)
+    )[1]
+    assert f2["edited_stale"] is False
+    assert f2["postable_body"] == "Edited two."
