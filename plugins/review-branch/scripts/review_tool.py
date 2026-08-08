@@ -79,6 +79,19 @@ def data_commit(message: str) -> None:
         git(root, "commit", "-q", "-m", message)
 
 
+def cmd_init(slug: str, repo_dir: Path) -> Path:
+    ensure_data_repo()
+    base = data_root() / repo_id(repo_dir) / slug
+    existing = []
+    for p in base.glob("round-*"):
+        tail = p.name.removeprefix("round-")
+        if p.is_dir() and tail.isdigit():
+            existing.append(int(tail))
+    round_dir = base / f"round-{max(existing, default=0) + 1}"
+    round_dir.mkdir(parents=True)
+    return round_dir.resolve()
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="review-branch", description="review-branch tool")
     parser.add_argument("--version", action="version", version=__version__)
@@ -96,6 +109,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command is None:
         parser.print_usage(sys.stderr)
         return 2
+    if args.command == "init":
+        print(cmd_init(args.slug, Path.cwd()))
+        return 0
     print(f"{args.command}: not implemented", file=sys.stderr)
     return 2
 
