@@ -13,10 +13,13 @@ import html
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import threading
+import time
 import tomllib
+import urllib.request
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -735,6 +738,106 @@ def make_server(port: int, root: Path | None = None) -> ThreadingHTTPServer:
     return ThreadingHTTPServer(("127.0.0.1", port), handler)
 
 
+def current_port() -> int:
+    return int(os.environ.get("REVIEW_BRANCH_PORT", DEFAULT_PORT))
+
+
+def pidfile() -> Path:
+    return state_root() / "daemon.pid"
+
+
+def health_check(port: int) -> dict | None:
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=1) as resp:
+            return json.loads(resp.read())
+    except Exception:
+        return None
+
+
+def _vtuple(version: str) -> tuple:
+    return tuple(int(x) for x in re.findall(r"\d+", version)) or (0,)
+
+
+def daemon_action(health: dict | None) -> str:
+    if health is None:
+        return "start"
+    if health.get("app") != APP_NAME:
+        return "squatter"
+    if _vtuple(str(health.get("version", "0"))) < _vtuple(__version__):
+        return "restart"
+    return "use"
+
+
+def spawn_daemon(port: int) -> None:
+    state_root().mkdir(parents=True, exist_ok=True)
+    log = (state_root() / "daemon.log").open("a")
+    subprocess.Popen(
+        [sys.executable, str(Path(__file__).resolve()), "daemon"],
+        stdout=log,
+        stderr=log,
+        stdin=subprocess.DEVNULL,
+        start_new_session=True,
+        env={**os.environ, "REVIEW_BRANCH_PORT": str(port)},
+    )
+
+
+def _wait(predicate, tries: int = 50, delay: float = 0.1) -> bool:
+    for _ in range(tries):
+        if predicate():
+            return True
+        time.sleep(delay)
+    return False
+
+
+def cmd_open(round_dir: Path) -> str:
+    if not (round_dir / "review.toml").exists():
+        raise SystemExit(f"{round_dir}: no review.toml")
+    route = route_for(round_dir)
+    port = current_port()
+    action = daemon_action(health_check(port))
+    if action == "squatter":
+        raise SystemExit(f"port {port} is in use by another application; set REVIEW_BRANCH_PORT")
+    if action == "restart":
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/api/shutdown", method="POST", data=b"")
+        try:
+            urllib.request.urlopen(req, timeout=2)
+        except Exception:
+            pass
+        _wait(lambda: health_check(port) is None)
+        action = "start"
+    if action == "start":
+        spawn_daemon(port)
+        if not _wait(lambda: health_check(port) is not None):
+            raise SystemExit(f"daemon failed to start; see {state_root() / 'daemon.log'}")
+    return f"http://127.0.0.1:{port}/{route}/"
+
+
+def cmd_daemon() -> int:
+    server = make_server(current_port())
+    state_root().mkdir(parents=True, exist_ok=True)
+    pidfile().write_text(str(os.getpid()))
+    try:
+        server.serve_forever()
+    finally:
+        pidfile().unlink(missing_ok=True)
+    return 0
+
+
+def cmd_stop() -> int:
+    pf = pidfile()
+    if not pf.exists():
+        print("daemon not running (no pidfile)")
+        return 0
+    pid = int(pf.read_text().strip())
+    try:
+        os.kill(pid, signal.SIGTERM)
+        print(f"stopped daemon (pid {pid})")
+    except ProcessLookupError:
+        print(f"removed stale pidfile (pid {pid} not running)")
+    pf.unlink(missing_ok=True)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="review-branch", description="review-branch tool")
     parser.add_argument("--version", action="version", version=__version__)
@@ -767,6 +870,13 @@ def main(argv: list[str] | None = None) -> int:
         exclude = {x for x in args.exclude.split(",") if x}
         print(json.dumps(cmd_manifest(Path(args.review_dir), exclude), indent=2))
         return 0
+    if args.command == "open":
+        print(cmd_open(Path(args.review_dir)))
+        return 0
+    if args.command == "daemon":
+        return cmd_daemon()
+    if args.command == "stop":
+        return cmd_stop()
     print(f"{args.command}: not implemented", file=sys.stderr)
     return 2
 
