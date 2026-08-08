@@ -1,6 +1,7 @@
 # ABOUTME: tests for daemon lifecycle: action decisions, open against a live server, stop
 # ABOUTME: uses an in-thread server for open and a throwaway child process for stop
 
+import socket
 import subprocess
 import sys
 import threading
@@ -48,3 +49,23 @@ def test_stop_tolerates_stale_pidfile(env):
     review_tool.pidfile().write_text("999999")
     assert review_tool.cmd_stop() == 0
     assert not review_tool.pidfile().exists()
+
+
+def test_open_spawns_daemon_on_dead_port(env, monkeypatch, capsys):
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    monkeypatch.setenv("REVIEW_BRANCH_PORT", str(port))
+    d = review_tool.data_root() / "proj-abcd" / "mr-4" / "round-1"
+    d.mkdir(parents=True)
+    (d / "review.toml").write_text(REVIEW_TOML)
+    try:
+        assert review_tool.main(["open", str(d)]) == 0
+        url = capsys.readouterr().out.strip()
+        assert url == f"http://127.0.0.1:{port}/proj-abcd/mr-4/round-1/"
+        health = review_tool.health_check(port)
+        assert health is not None
+        assert health["app"] == "review-branch"
+    finally:
+        review_tool.cmd_stop()
+        assert review_tool._wait(lambda: review_tool.health_check(port) is None)
