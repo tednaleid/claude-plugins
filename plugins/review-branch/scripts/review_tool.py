@@ -9,6 +9,7 @@
 
 import argparse
 import hashlib
+import html
 import json
 import os
 import re
@@ -16,6 +17,8 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
+
+from markdown_it import MarkdownIt
 
 __version__ = "0.2.0"
 APP_NAME = "review-branch"
@@ -166,6 +169,56 @@ def cmd_manifest(round_dir: Path, exclude: set[str]) -> list[dict]:
             )
         entries.append({"file": path, "line": line, "body": body})
     return entries
+
+
+_MD = MarkdownIt("commonmark").enable("table")
+
+
+def esc(s) -> str:
+    return html.escape(str(s), quote=True)
+
+
+def md_html(text: str) -> str:
+    return _MD.render(text or "")
+
+
+def diff_link(meta: dict, path: str, line: int | None) -> str | None:
+    url = meta.get("url")
+    if not url:
+        return None
+    if meta.get("vcs") == "glab":
+        return f"{url}/diffs#diff-content-{hashlib.sha1(path.encode()).hexdigest()}"
+    if meta.get("vcs") == "gh":
+        frag = f"diff-{hashlib.sha256(path.encode()).hexdigest()}"
+        if line:
+            frag += f"R{line}"
+        return f"{url}/files#{frag}"
+    return None
+
+
+def version_token(round_dir: Path) -> str:
+    digest = hashlib.sha1()
+    names = ["review.toml", "state.json"]
+    review_path = round_dir / "review.toml"
+    if review_path.exists():
+        names += [a.get("path", "") for a in load_review(round_dir).get("assets", [])]
+    for name in names:
+        p = round_dir / name
+        if name and p.exists():
+            st = p.stat()
+            digest.update(f"{name}:{st.st_mtime_ns}:{st.st_size};".encode())
+    return digest.hexdigest()[:16]
+
+
+def route_for(round_dir: Path) -> str:
+    root = data_root().resolve()
+    try:
+        rel = round_dir.resolve().relative_to(root)
+    except ValueError:
+        raise SystemExit(f"{round_dir} is not under the data root {root}")
+    if len(rel.parts) != 3:
+        raise SystemExit(f"{round_dir}: expected <repo-id>/<slug>/round-N under the data root")
+    return "/".join(rel.parts)
 
 
 def main(argv: list[str] | None = None) -> int:
