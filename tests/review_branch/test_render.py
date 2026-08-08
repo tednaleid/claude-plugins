@@ -47,6 +47,18 @@ file = "b.py"
 body = "FYI."
 commentable = false
 
+[[findings]]
+id = "f3"
+severity = "high"
+title = "Already posted"
+file = "c.py"
+lines = "7"
+body = "Posted earlier."
+comment = "Posted draft."
+posted_url = "https://gitlab.example.com/note/42"
+posted_at = "2026-08-08T00:00:00Z"
+posted_body = "Final posted text."
+
 [[coverage]]
 surface = "API 422"
 covered = ""
@@ -60,7 +72,9 @@ def round_dir(env):
     d.mkdir(parents=True)
     (d / "review.toml").write_text(REVIEW_TOML)
     (d / "diagram.svg").write_text('<svg xmlns="http://www.w3.org/2000/svg"><title>seq</title></svg>')
-    (d / "state.json").write_text(json.dumps({"findings": {"f1": {"disposition": "post"}}}))
+    (d / "state.json").write_text(
+        json.dumps({"findings": {"f1": {"disposition": "post", "note": "soften", "note_rev": 0}}})
+    )
     return d
 
 
@@ -81,6 +95,31 @@ def test_f2_has_no_comment_area(round_dir):
     # slice from f2's card to the next h2 (the coverage table heading)
     f2_chunk = page.split('data-fid="f2"')[1].split("<h2>")[0]
     assert "textarea" not in f2_chunk
+
+
+def test_posted_finding_renders_frozen(round_dir):
+    page = review_tool.render_html(round_dir, served=True)
+    f3_chunk = page.split('data-fid="f3"')[1].split("<h2>")[0]
+    assert 'badge posted' in f3_chunk
+    assert "https://gitlab.example.com/note/42" in f3_chunk
+    assert "Final posted text." in f3_chunk
+    assert "textarea" not in f3_chunk
+
+
+def test_stale_note_renders_applied_div(round_dir):
+    page = review_tool.render_html(round_dir, served=True)
+    f1_chunk = page.split('data-fid="f1"')[1].split('data-fid="f2"')[0]
+    assert 'class="applied"' in f1_chunk
+    assert "applied: soften" in f1_chunk
+    assert 'class="note" placeholder="tell Claude how to adjust this"></textarea>' in f1_chunk
+
+
+def test_summary_shows_med_zero_hides_low_zero(round_dir):
+    page = review_tool.render_html(round_dir, served=True)
+    assert '<div class="num high">2</div>' in page
+    assert '<div class="num med">0</div>' in page
+    assert 'num low' not in page
+    assert '<div class="num info">1</div>' in page
 
 
 def test_cmd_render_writes_file_and_commits(round_dir, capsys):
