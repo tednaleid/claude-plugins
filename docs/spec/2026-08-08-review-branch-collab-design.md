@@ -80,8 +80,12 @@ Daemon plumbing (pidfile, log): `${XDG_STATE_HOME:-~/.local/state}/review-branch
   orphans its old id; acceptable.
 - The git repo at the data root is created on first use. Every write by the
   tool (render, state save, posted results) runs `git add -A && git commit`
-  with a message like `omni-a3f2 mr-124 round-1: state update`. History is
-  noisy by design; it is read forensically, not linearly. A remote can be
+  with a structured message: `<repo-id> <slug> round-N: <action>`, where the
+  action names finding ids when it concerns one (`f3 comment rev 2`,
+  `f3 posted`, `state update`). This makes git the revision archive for
+  comment rewrites: `git log --oneline | grep f3` finds every version, and
+  `git log -p -- <round>/review.toml` replays the whole negotiation. History
+  is noisy by design; it is read forensically, not linearly. A remote can be
   added by hand for the rare push-it-somewhere case.
 - The review worktree's own `.llm/` holds only ephemeral scratch during a
   review run (diff.patch, changed-files.txt, prior-comments.md for lens
@@ -171,13 +175,21 @@ overflow.
 
 - `review.toml` is written only by Claude. `state.json` is written only by the
   daemon. The renderer and manifest generator merge the two; Ted's edits win.
+- `review.toml` mutates in place; prior versions live in the data-root git
+  history (see Storage layout). No embedded revision arrays: one history
+  mechanism, and it is git.
+- Findings are append-only within a round: ids are stable, nothing is deleted
+  or renumbered. A wrong finding gets disposition Skip. A re-review is a new
+  round directory, not an edit.
 - Posted results are Claude's action and audit record, so they live in
   `review.toml` (`posted_at`, `posted_url`, `posted_body`).
 - When Claude rewrites a comment per a note, the new draft lands in
   `review.toml` with `comment_rev` bumped. The page treats `note` and
-  `edited_comment` with a rev older than `comment_rev` as consumed: it clears
-  the note box and textarea prefill. Nothing is lost because Claude read both
-  the edit and the note when rewriting.
+  `edited_comment` with a rev older than `comment_rev` as consumed: the
+  textarea prefill resets to the new draft, and the consumed note stays
+  visible as a dimmed "applied: ..." annotation on the card (so Ted can check
+  the rewrite honored it) until a new note is typed over it. Nothing is lost
+  because Claude read both the edit and the note when rewriting.
 - Merge rule for the postable body: `edited_comment` if its rev equals
   `comment_rev`, else `comment`.
 
@@ -259,6 +271,12 @@ Subcommands:
   suggested fix, then the comment area: textarea prefilled with the current
   draft (edits save as `edited_comment`), a note box ("tell Claude how to
   adjust this"), and the Post / Skip / Undecided control (default Undecided).
+- The `file:lines` reference links to the MR/PR diff view, computed by the
+  renderer from existing fields (no new toml fields). GitLab:
+  `<mr-url>/diffs#diff-content-<sha1(file_path)>` (file-scoped guaranteed,
+  line-level anchor best effort since its format varies across GitLab
+  versions). GitHub: `<pr-url>/files#diff-<sha256(file_path)>R<line>` (file
+  and right-side line). Local mode: plain text, no link.
 - Findings with `commentable = false` render without the comment area.
 - Posted findings show a posted badge linking to `posted_url`; their inputs
   freeze.
@@ -439,4 +457,6 @@ Pytest via a justfile target in this repo, no Claude involvement:
   Architecture).
 - Live collaborative editing (multiple simultaneous browsers on one review);
   last-writer-wins whole-document saves are accepted.
+- An in-page version browser for comment revisions; the data-root git history
+  is the archive until it is missed in practice.
 - Pushing the data-root repo to a remote automatically.
