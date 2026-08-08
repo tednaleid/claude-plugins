@@ -128,6 +128,25 @@ def test_concurrent_posts_all_succeed(served):
     assert saved["findings"]["f1"]["note"].startswith("n")
 
 
+def test_malformed_toml_returns_500_not_dropped(served):
+    port, d = served
+    (d / "review.toml").write_text("[review\n")
+    status, data = request(port, "GET", "/proj-abcd/mr-7/round-1/")
+    assert status == 500
+    assert "error" in json.loads(data)
+
+
+def test_index_skips_review_that_vanishes_mid_scan(env):
+    root = review_tool.data_root()
+    d = root / "proj-abcd" / "mr-3" / "round-1"
+    d.mkdir(parents=True)
+    # matches the review.toml glob pattern by name but isn't a readable file,
+    # simulating a round directory that vanished/changed shape mid-scan
+    (d / "review.toml").mkdir()
+    page = review_tool.index_html(root)
+    assert "no reviews yet" in page
+
+
 def test_index_sorts_by_latest_activity(env):
     root = review_tool.data_root()
     a = root / "proj-abcd" / "mr-1" / "round-1"

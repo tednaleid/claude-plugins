@@ -122,6 +122,28 @@ def test_summary_shows_med_zero_hides_low_zero(round_dir):
     assert '<div class="num info">1</div>' in page
 
 
+def test_unknown_severity_renders_without_raising(env):
+    d = review_tool.data_root() / "proj-abcd" / "mr-9" / "round-1"
+    d.mkdir(parents=True)
+    (d / "review.toml").write_text(
+        """
+[review]
+title = "Odd severity review"
+
+[[findings]]
+id = "f1"
+severity = "medium"
+title = "Weird severity value"
+file = "a.py"
+lines = "1"
+body = "x"
+comment = "Draft."
+"""
+    )
+    page = review_tool.render_html(d, served=True)
+    assert "Weird severity value" in page
+
+
 def test_cmd_render_writes_file_and_commits(round_dir, capsys):
     assert review_tool.main(["render", str(round_dir)]) == 0
     out_path = round_dir / "review.html"

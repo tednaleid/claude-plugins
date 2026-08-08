@@ -247,14 +247,15 @@ def meta_row(meta: dict) -> str:
 
 
 def summary_cards(findings: list[dict]) -> str:
-    counts = {"high": 0, "med": 0, "low": 0, "info": 0}
+    counts: dict[str, int] = {}
     for f in findings:
-        counts[f.get("severity", "info")] += 1
+        sev = f.get("severity", "info")
+        counts[sev] = counts.get(sev, 0) + 1
     cards = []
     for sev, name in (("high", "High"), ("med", "Medium"), ("low", "Low / nits"), ("info", "Out-of-scope flags")):
-        if counts[sev] or sev in ("high", "med"):
+        if counts.get(sev, 0) or sev in ("high", "med"):
             cards.append(
-                f'<div class="card"><div class="num {sev}">{counts[sev]}</div><div class="label">{name}</div></div>'
+                f'<div class="card"><div class="num {sev}">{counts.get(sev, 0)}</div><div class="label">{name}</div></div>'
             )
     return "\n".join(cards)
 
@@ -432,6 +433,7 @@ TEMPLATE = """<!doctype html>
 (function () {
   var baked = window.BAKED;
   var state = (baked.state && baked.state.findings) ? baked.state : { findings: {} };
+  var touched = {};
   var token = baked.token;
   var served = baked.served && location.protocol !== "file:";
   var dirty = 0;
@@ -468,17 +470,24 @@ TEMPLATE = """<!doctype html>
       var checked = card.querySelector("input[type=radio]:checked");
       entry.disposition = checked && checked.value ? checked.value : null;
       var comment = card.querySelector("textarea.comment");
-      if (comment.value !== comment.defaultValue) {
-        entry.edited_comment = comment.value;
-        entry.edited_comment_rev = crev;
+      if (touched[fid + ":comment"]) {
+        if (comment.value !== comment.defaultValue) {
+          entry.edited_comment = comment.value;
+          entry.edited_comment_rev = crev;
+        } else {
+          delete entry.edited_comment;
+          delete entry.edited_comment_rev;
+        }
       }
       var note = card.querySelector("textarea.note");
-      if (note.value && note.value !== note.defaultValue) {
-        entry.note = note.value;
-        entry.note_rev = crev;
-      } else if (!note.value && note.defaultValue) {
-        delete entry.note;
-        delete entry.note_rev;
+      if (touched[fid + ":note"]) {
+        if (note.value) {
+          entry.note = note.value;
+          entry.note_rev = crev;
+        } else {
+          delete entry.note;
+          delete entry.note_rev;
+        }
       }
     });
     return state;
@@ -498,7 +507,7 @@ TEMPLATE = """<!doctype html>
       token = resp.token;
       hideBanner();
     }).catch(function () {
-      showBanner("server unreachable - " + dirty + " unsaved change(s) held in this tab. restart with: review-branch open <review-dir>", true);
+      showBanner("save failed (server error or unreachable) - " + dirty + " unsaved change(s) held in this tab. check daemon.log or restart with: review-branch open <review-dir>", true);
       saveTimer = setTimeout(save, 5000);
     });
   }
@@ -519,8 +528,15 @@ TEMPLATE = """<!doctype html>
   }
 
   cards.forEach(function (card) {
+    var fid = card.dataset.fid;
     card.querySelectorAll("input[type=radio]").forEach(function (el) { el.addEventListener("change", schedule); });
-    card.querySelectorAll("textarea").forEach(function (el) { el.addEventListener("input", schedule); });
+    card.querySelectorAll("textarea").forEach(function (el) {
+      el.addEventListener("input", function () {
+        if (el.classList.contains("comment")) touched[fid + ":comment"] = true;
+        if (el.classList.contains("note")) touched[fid + ":note"] = true;
+        schedule();
+      });
+    });
   });
 
   setInterval(function () {
@@ -640,7 +656,7 @@ def index_html(root: Path) -> str:
         d = toml_path.parent
         try:
             review = tomllib.loads(toml_path.read_text())
-        except tomllib.TOMLDecodeError:
+        except (tomllib.TOMLDecodeError, OSError):
             continue
         findings = merged_findings(review, load_state(d))
         counts: dict[str, int] = {}
@@ -685,6 +701,15 @@ class ReviewHandler(BaseHTTPRequestHandler):
         return d if (d / "review.toml").exists() else None
 
     def do_GET(self):
+        try:
+            self._handle_get()
+        except (Exception, SystemExit) as e:
+            try:
+                self._json(500, {"error": str(e)})
+            except Exception:
+                pass
+
+    def _handle_get(self):
         path = urlparse(self.path).path
         if path == "/api/health":
             return self._json(200, {"app": APP_NAME, "version": __version__, "data_root": str(self.root)})
@@ -711,6 +736,15 @@ class ReviewHandler(BaseHTTPRequestHandler):
         return self._send(200, render_html(d, served=True))
 
     def do_POST(self):
+        try:
+            self._handle_post()
+        except (Exception, SystemExit) as e:
+            try:
+                self._json(500, {"error": str(e)})
+            except Exception:
+                pass
+
+    def _handle_post(self):
         path = urlparse(self.path).path
         if path == "/api/shutdown":
             threading.Thread(target=self.server.shutdown).start()
@@ -736,7 +770,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
                 data_commit(f"{parts[0]} {parts[1]} {parts[2]}: state update")
                 token = version_token(d)
             return self._json(200, {"ok": True, "token": token})
-        except Exception as e:
+        except (Exception, SystemExit) as e:
             return self._json(500, {"error": str(e)})
 
 
