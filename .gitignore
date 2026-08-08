@@ -3,3 +3,5 @@ dist/
 .DS_Store
 *.tgz
 .llm
+__pycache__/
+*.pyc

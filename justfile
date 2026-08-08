@@ -101,3 +101,7 @@ retag plugin version:
     git tag -d "$tag" || true
     git tag -a "$tag" -F "$notes_file"
     git push && git push --tags
+
+# Run python script tests
+test:
+    uv run --python 3.12 --with pytest --with markdown-it-py pytest tests -q
