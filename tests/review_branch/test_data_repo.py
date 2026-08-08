@@ -14,12 +14,20 @@ def test_ensure_data_repo_is_idempotent(env):
     review_tool.ensure_data_repo()  # must not raise or re-init
 
 
+def test_ensure_data_repo_sets_local_identity(env):
+    root = review_tool.ensure_data_repo()
+    assert review_tool.git(root, "config", "user.name") == "review-branch"
+    assert review_tool.git(root, "config", "user.email") == "review-branch@localhost"
+
+
 def test_data_commit_records_message(env):
     root = review_tool.ensure_data_repo()
     (root / "f.txt").write_text("hello\n")
     review_tool.data_commit("proj-abcd mr-1 round-1: state update")
     log = review_tool.git(root, "log", "--oneline")
     assert "proj-abcd mr-1 round-1: state update" in log
+    author = review_tool.git(root, "log", "-1", "--format=%an <%ae>")
+    assert author == "review-branch <review-branch@localhost>"
 
 
 def test_data_commit_with_no_changes_is_noop(env):
