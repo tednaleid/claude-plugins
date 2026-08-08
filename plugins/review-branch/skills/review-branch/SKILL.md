@@ -161,8 +161,8 @@ Write `$REVIEW_DIR/review.toml` incrementally per `references/data-format.md`:
 
 1. First `Write`: the `[review]` table, `[overall]`, and any `[[hex]]`,
    `[[coverage]]`, `[[files_touched]]` rows.
-2. Then append findings in batches (one `Edit` per lens's merged findings).
-   Never emit the whole document in one tool call.
+2. Then append the globally sorted findings in batches of about five per
+   `Edit`. Never emit the whole document in one tool call.
 
 Every finding that warrants an MR/PR comment gets a `comment` draft (tone per
 `references/agent-contract.md`) and an `anchor` on a line the diff touches.
@@ -211,7 +211,8 @@ picks the mode:
   held ones for discussion. `review-branch manifest "$REVIEW_DIR"` emits the
   batch for the comment skill.
 - After posting: write `posted_at`, `posted_url`, `posted_body` into
-  review.toml, commit message `<rid> <slug> round-N: fN posted`, re-render.
+  review.toml, then run `review-branch render`; the render commit sweeps the
+  posted fields into history.
 
 ## Rules and anti-patterns
 
