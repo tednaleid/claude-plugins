@@ -221,6 +221,375 @@ def route_for(round_dir: Path) -> str:
     return "/".join(rel.parts)
 
 
+def meta_row(meta: dict) -> str:
+    spans = []
+    label = {"glab": "MR", "gh": "PR"}.get(meta.get("vcs"))
+    if label and meta.get("url") and meta.get("number"):
+        mark = "!" if label == "MR" else "#"
+        spans.append(
+            f'<span><strong>{label}:</strong> <a href="{esc(meta["url"])}">{mark}{meta["number"]}</a></span>'
+        )
+    if meta.get("source_branch"):
+        arrow = f'{esc(meta["source_branch"])} -&gt; {esc(meta.get("target_branch", ""))}'
+        spans.append(f"<span><strong>Branch:</strong> {arrow}</span>")
+    for key, name in (("commits", "Commits"), ("files", "Files"), ("spec", "Spec")):
+        if meta.get(key):
+            spans.append(f"<span><strong>{name}:</strong> {esc(meta[key])}</span>")
+    return "\n".join(spans)
+
+
+def summary_cards(findings: list[dict]) -> str:
+    counts = {"high": 0, "med": 0, "low": 0, "info": 0}
+    for f in findings:
+        counts[f.get("severity", "info")] += 1
+    cards = []
+    for sev, name in (("high", "High"), ("med", "Medium"), ("low", "Low / nits"), ("info", "Out-of-scope flags")):
+        if counts[sev] or sev in ("high", "med"):
+            cards.append(
+                f'<div class="card"><div class="num {sev}">{counts[sev]}</div><div class="label">{name}</div></div>'
+            )
+    return "\n".join(cards)
+
+
+def assets_html(round_dir: Path, review: dict) -> str:
+    parts = []
+    for a in review.get("assets", []):
+        p = round_dir / a["path"]
+        try:
+            content = p.read_text()
+        except OSError as e:
+            raise SystemExit(f"asset {p}: {e}")
+        if a.get("type") == "svg":
+            content = re.sub(r"^\s*<\?xml[^>]*\?>", "", content)
+        cap = f"<figcaption>{esc(a['caption'])}</figcaption>" if a.get("caption") else ""
+        parts.append(f'<figure class="asset">{content}{cap}</figure>')
+    return "\n".join(parts)
+
+
+def table_html(title: str, headers: list[str], rows: list[list[str]]) -> str:
+    if not rows:
+        return ""
+    head = "".join(f"<th>{esc(h)}</th>" for h in headers)
+    body = "\n".join("<tr>" + "".join(f"<td>{c}</td>" for c in row) + "</tr>" for row in rows)
+    return f"<h2>{esc(title)}</h2>\n<table>\n<tr>{head}</tr>\n{body}\n</table>"
+
+
+def _dash(value) -> str:
+    return esc(value) if value else "&mdash;"
+
+
+def finding_card(f: dict, meta: dict) -> str:
+    sev = f.get("severity", "info")
+    fid = f["id"]
+    _, line = parse_anchor(f)
+    fileref = f'{f["file"]}:{f["lines"]}' if f.get("lines") else f["file"]
+    link = diff_link(meta, f["file"], line)
+    file_html = f'<a href="{esc(link)}">{esc(fileref)}</a>' if link else esc(fileref)
+    head = [
+        f'<span class="num">{esc(fid)}</span>',
+        f'<span class="title">{esc(f.get("title", ""))}</span>',
+        f'<span class="badge {sev}">{sev}</span>',
+    ]
+    head += [f'<span class="tag">{esc(lens)}</span>' for lens in f.get("lenses", [])]
+    if f["posted"]:
+        head.append(f'<a class="badge posted" href="{esc(f.get("posted_url", ""))}">posted</a>')
+    parts = [
+        f'<div class="finding {sev}" data-fid="{esc(fid)}" data-rev="{f.get("comment_rev", 1)}">',
+        f'<div class="head">{" ".join(head)}</div>',
+        f'<div class="file">{file_html}</div>',
+        md_html(f.get("body", "")),
+    ]
+    if f.get("snippet"):
+        parts.append(f"<pre><code>{esc(f['snippet'])}</code></pre>")
+    if f.get("fix"):
+        parts.append(f"<p><strong>Suggested fix:</strong> {esc(f['fix'])}</p>")
+    if f["posted"]:
+        parts.append(f"<pre><code>{esc(f.get('posted_body', ''))}</code></pre>")
+    elif f.get("commentable", True):
+        area = ['<div class="comment-area">']
+        if f["note_stale"]:
+            area.append(f'<div class="applied">applied: {esc(f["note"])}</div>')
+        area.append('<label class="small">Comment draft</label>')
+        area.append(f'<textarea class="comment">{esc(f["postable_body"] or "")}</textarea>')
+        area.append('<label class="small">Note to Claude</label>')
+        note_now = "" if f["note_stale"] else (f.get("note") or "")
+        area.append(
+            f'<textarea class="note" placeholder="tell Claude how to adjust this">{esc(note_now)}</textarea>'
+        )
+        dispo = f["disposition"] or ""
+        area.append('<div class="dispo">')
+        for value, name in (("post", "Post"), ("skip", "Skip"), ("", "Undecided")):
+            checked = " checked" if dispo == value else ""
+            area.append(
+                f'<label><input type="radio" name="dispo-{esc(fid)}" value="{value}"{checked}> {name}</label>'
+            )
+        area.append("</div></div>")
+        parts.append("\n".join(area))
+    parts.append("</div>")
+    return "\n".join(parts)
+
+
+TEMPLATE = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title><!--TITLE--></title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #161922; --panel2: #1c2030; --border: #2a3042;
+    --text: #e6e8ee; --muted: #9aa3b2; --accent: #7aa2f7;
+    --red: #f7768e; --amber: #e0af68; --green: #9ece6a; --blue: #7dcfff;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 24px 80px; }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  h2 { margin: 32px 0 10px; font-size: 17px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  .meta { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 12px; margin: 6px 0 22px; }
+  .meta strong { color: var(--text); font-weight: 500; }
+  a { color: var(--accent); }
+  code, pre { font-family: var(--mono); font-size: 12.5px; }
+  pre { background: var(--panel2); border: 1px solid var(--border); border-radius: 6px;
+        padding: 12px; overflow-x: auto; margin: 8px 0; }
+  code { background: var(--panel2); padding: 1px 5px; border-radius: 3px; }
+  pre code { background: transparent; padding: 0; }
+  figure.asset { margin: 20px 0; background: var(--panel); border: 1px solid var(--border);
+                 border-radius: 6px; padding: 16px; overflow-x: auto; }
+  figure.asset figcaption { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .finding { background: var(--panel); border: 1px solid var(--border);
+             border-left: 4px solid var(--muted); border-radius: 6px; padding: 14px 16px; margin: 14px 0; }
+  .finding.high { border-left-color: var(--red); }
+  .finding.med  { border-left-color: var(--amber); }
+  .finding.low  { border-left-color: var(--blue); }
+  .finding.info { border-left-color: var(--green); }
+  .finding .head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 4px; flex-wrap: wrap; }
+  .finding .num { color: var(--muted); font-family: var(--mono); font-size: 12px; min-width: 28px; }
+  .finding .title { font-weight: 600; font-size: 14.5px; }
+  .badge { font-family: var(--mono); font-size: 10.5px; padding: 1px 7px; border-radius: 10px;
+           text-transform: uppercase; letter-spacing: .04em; }
+  .badge.high { background: rgba(247,118,142,.15); color: var(--red); }
+  .badge.med  { background: rgba(224,175,104,.15); color: var(--amber); }
+  .badge.low  { background: rgba(125,207,255,.15); color: var(--blue); }
+  .badge.info { background: rgba(158,206,106,.15); color: var(--green); }
+  .badge.posted { background: rgba(158,206,106,.15); color: var(--green); text-decoration: none; }
+  .file { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .small { color: var(--muted); font-size: 12.5px; display: block; margin-top: 10px; }
+  .tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px;
+         background: var(--panel2); border: 1px solid var(--border); color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; }
+  th, td { text-align: left; border-bottom: 1px solid var(--border); padding: 8px 10px;
+           vertical-align: top; font-size: 13px; }
+  th { color: var(--muted); font-weight: 500; }
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                  gap: 10px; margin: 12px 0 20px; }
+  .summary-grid .card { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+  .summary-grid .num { font-size: 22px; font-weight: 600; }
+  .summary-grid .label { color: var(--muted); font-size: 12px; }
+  .num.high { color: var(--red); } .num.med { color: var(--amber); }
+  .num.low { color: var(--blue); } .num.info { color: var(--green); }
+  .comment-area { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 4px; }
+  textarea { width: 100%; min-height: 72px; margin-top: 4px; background: var(--panel2);
+             color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+             padding: 8px; font: 12.5px/1.5 var(--mono); resize: vertical; }
+  textarea.note { min-height: 40px; font-family: inherit; }
+  textarea:disabled, input:disabled { opacity: .5; }
+  .applied { color: var(--muted); font-size: 12px; font-style: italic; margin-top: 8px; }
+  .dispo { display: flex; gap: 16px; margin-top: 8px; color: var(--muted); font-size: 13px; }
+  .dispo label { cursor: pointer; }
+  .controls { display: flex; gap: 10px; align-items: center; margin: 8px 0 18px;
+              font-size: 12px; color: var(--muted); }
+  .progress { font-family: var(--mono); }
+  #banner { display: none; position: sticky; top: 0; background: rgba(224,175,104,.12);
+            border: 1px solid var(--amber); color: var(--amber); border-radius: 6px;
+            padding: 8px 12px; margin: 0 0 16px; font-size: 12.5px; }
+  #banner.show { display: block; }
+  #banner a { color: var(--amber); margin-left: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<div id="banner"><span id="banner-msg"></span><a href="#" id="banner-copy" hidden>copy unsaved state</a></div>
+<h1><!--TITLE--></h1>
+<div class="sub"><!--SUBTITLE--></div>
+<div class="meta"><!--META--></div>
+<div class="summary-grid"><!--SUMMARY--></div>
+<div class="controls"><span class="progress" id="progress"></span></div>
+<!--CONTENT-->
+</div>
+<script>window.BAKED = <!--BAKED-->;</script>
+<script>
+(function () {
+  var baked = window.BAKED;
+  var state = (baked.state && baked.state.findings) ? baked.state : { findings: {} };
+  var token = baked.token;
+  var served = baked.served && location.protocol !== "file:";
+  var dirty = 0;
+  var saveTimer = null;
+  var banner = document.getElementById("banner");
+  var bannerMsg = document.getElementById("banner-msg");
+  var bannerCopy = document.getElementById("banner-copy");
+  var progress = document.getElementById("progress");
+  var cards = Array.prototype.slice.call(document.querySelectorAll(".finding[data-fid]"));
+
+  function showBanner(msg, withCopy) {
+    bannerMsg.textContent = msg;
+    bannerCopy.hidden = !withCopy;
+    banner.classList.add("show");
+  }
+  function hideBanner() { banner.classList.remove("show"); }
+
+  function updateProgress() {
+    var counts = { post: 0, skip: 0, undecided: 0 };
+    cards.forEach(function (card) {
+      if (!card.querySelector(".dispo")) return;
+      var checked = card.querySelector("input[type=radio]:checked");
+      counts[checked && checked.value ? checked.value : "undecided"] += 1;
+    });
+    progress.textContent = counts.post + " post, " + counts.skip + " skip, " + counts.undecided + " undecided";
+  }
+
+  function collect() {
+    cards.forEach(function (card) {
+      if (!card.querySelector(".dispo")) return;
+      var fid = card.dataset.fid;
+      var crev = parseInt(card.dataset.rev, 10) || 1;
+      var entry = state.findings[fid] || (state.findings[fid] = {});
+      var checked = card.querySelector("input[type=radio]:checked");
+      entry.disposition = checked && checked.value ? checked.value : null;
+      var comment = card.querySelector("textarea.comment");
+      if (comment.value !== comment.defaultValue) {
+        entry.edited_comment = comment.value;
+        entry.edited_comment_rev = crev;
+      }
+      var note = card.querySelector("textarea.note");
+      if (note.value && note.value !== note.defaultValue) {
+        entry.note = note.value;
+        entry.note_rev = crev;
+      } else if (!note.value && note.defaultValue) {
+        delete entry.note;
+        delete entry.note_rev;
+      }
+    });
+    return state;
+  }
+
+  function save() {
+    saveTimer = null;
+    fetch("api/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(collect())
+    }).then(function (r) {
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }).then(function (resp) {
+      dirty = 0;
+      token = resp.token;
+      hideBanner();
+    }).catch(function () {
+      showBanner("server unreachable - " + dirty + " unsaved change(s) held in this tab. restart with: review-branch open <review-dir>", true);
+      saveTimer = setTimeout(save, 5000);
+    });
+  }
+
+  function schedule() {
+    dirty += 1;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 2000);
+    updateProgress();
+  }
+
+  updateProgress();
+
+  if (!served) {
+    document.querySelectorAll("textarea, input").forEach(function (el) { el.disabled = true; });
+    showBanner("read-only snapshot - run: review-branch open <review-dir> to edit", false);
+    return;
+  }
+
+  cards.forEach(function (card) {
+    card.querySelectorAll("input[type=radio]").forEach(function (el) { el.addEventListener("change", schedule); });
+    card.querySelectorAll("textarea").forEach(function (el) { el.addEventListener("input", schedule); });
+  });
+
+  setInterval(function () {
+    fetch("api/version").then(function (r) { return r.json(); }).then(function (resp) {
+      if (resp.token !== token && !dirty && !saveTimer) location.reload();
+    }).catch(function () {});
+  }, 2000);
+
+  window.addEventListener("beforeunload", function (e) {
+    if (dirty || saveTimer) { e.preventDefault(); e.returnValue = ""; }
+  });
+
+  bannerCopy.addEventListener("click", function (e) {
+    e.preventDefault();
+    navigator.clipboard.writeText(JSON.stringify(collect()));
+  });
+})();
+</script>
+</body>
+</html>
+"""
+
+
+def render_html(round_dir: Path, served: bool) -> str:
+    review = load_review(round_dir)
+    state = load_state(round_dir)
+    meta = review.get("review", {})
+    findings = merged_findings(review, state)
+    content = [assets_html(round_dir, review)]
+    if review.get("overall", {}).get("body"):
+        content.append("<h2>Overall</h2>\n" + md_html(review["overall"]["body"]))
+    content.append("<h2>Findings</h2>")
+    content += [finding_card(f, meta) for f in findings]
+    content.append(
+        table_html(
+            "Hexagonal architecture compliance",
+            ["Boundary", "Change", "Status"],
+            [[esc(r.get("boundary", "")), esc(r.get("change", "")), esc(r.get("status", ""))] for r in review.get("hex", [])],
+        )
+    )
+    content.append(
+        table_html(
+            "What the tests do and don't cover",
+            ["Surface", "Covered", "Gap"],
+            [[esc(r.get("surface", "")), _dash(r.get("covered")), _dash(r.get("gap"))] for r in review.get("coverage", [])],
+        )
+    )
+    content.append(
+        table_html(
+            "Files touched",
+            ["File", "+/-", "Notes"],
+            [[f"<code>{esc(r.get('path', ''))}</code>", esc(r.get("delta", "")), esc(r.get("notes", ""))] for r in review.get("files_touched", [])],
+        )
+    )
+    baked = json.dumps(
+        {"served": served, "route": route_for(round_dir), "token": version_token(round_dir), "state": state}
+    ).replace("</", "<\\/")
+    subtitle = "Collaborative review tracker. Mark dispositions, edit drafts, leave notes for Claude."
+    return (
+        TEMPLATE
+        .replace("<!--TITLE-->", esc(meta.get("title", "review")))
+        .replace("<!--SUBTITLE-->", subtitle)
+        .replace("<!--META-->", meta_row(meta))
+        .replace("<!--SUMMARY-->", summary_cards(findings))
+        .replace("<!--CONTENT-->", "\n".join(part for part in content if part))
+        .replace("<!--BAKED-->", baked)
+    )
+
+
+def cmd_render(round_dir: Path) -> Path:
+    out = round_dir / "review.html"
+    out.write_text(render_html(round_dir, served=False))
+    rid, slug, rnd = route_for(round_dir).split("/")
+    data_commit(f"{rid} {slug} {rnd}: render")
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="review-branch", description="review-branch tool")
     parser.add_argument("--version", action="version", version=__version__)
@@ -242,6 +611,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.command == "init":
         print(cmd_init(args.slug, Path.cwd()))
+        return 0
+    if args.command == "render":
+        print(cmd_render(Path(args.review_dir)))
         return 0
     if args.command == "status":
         print(json.dumps(cmd_status(Path(args.review_dir)), indent=2))
