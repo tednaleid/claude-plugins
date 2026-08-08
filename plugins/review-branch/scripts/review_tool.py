@@ -8,13 +8,58 @@
 # ABOUTME: runs the review daemon, merges browser state, emits posting manifests
 
 import argparse
+import hashlib
+import os
+import subprocess
 import sys
+from pathlib import Path
 
 __version__ = "0.2.0"
 APP_NAME = "review-branch"
 DEFAULT_PORT = 43117
 
 SUBCOMMANDS = ("init", "render", "open", "status", "manifest", "install", "daemon", "stop")
+
+
+def data_root() -> Path:
+    override = os.environ.get("REVIEW_BRANCH_HOME")
+    if override:
+        return Path(override).expanduser()
+    xdg = os.environ.get("XDG_DATA_HOME", "~/.local/share")
+    return Path(xdg).expanduser() / APP_NAME
+
+
+def state_root() -> Path:
+    xdg = os.environ.get("XDG_STATE_HOME", "~/.local/state")
+    return Path(xdg).expanduser() / APP_NAME
+
+
+def git(cwd, *args, check: bool = True) -> str:
+    proc = subprocess.run(
+        ["git", "-C", str(cwd), *args], capture_output=True, text=True
+    )
+    if check and proc.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)} failed: {proc.stderr.strip()}")
+    return proc.stdout.strip()
+
+
+def git_ok(cwd, *args) -> str | None:
+    try:
+        return git(cwd, *args)
+    except RuntimeError:
+        return None
+
+
+def main_worktree(repo_dir: Path) -> Path:
+    common = git(repo_dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    return Path(common).parent
+
+
+def repo_id(repo_dir: Path) -> str:
+    root = main_worktree(repo_dir)
+    seed = git_ok(repo_dir, "remote", "get-url", "origin") or str(root)
+    digest = hashlib.sha256(seed.encode()).hexdigest()[:4]
+    return f"{root.name}-{digest}"
 
 
 def main(argv: list[str] | None = None) -> int:
