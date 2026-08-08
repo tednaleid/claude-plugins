@@ -1,6 +1,7 @@
 # ABOUTME: daemon smoke tests over a real ThreadingHTTPServer on an ephemeral port
 # ABOUTME: covers health, index, page serving, state round-trip, version token, 404s
 
+import concurrent.futures
 import http.client
 import json
 import threading
@@ -107,3 +108,20 @@ def test_bad_json_400(served):
     port, _ = served
     status, _ = request(port, "POST", "/proj-abcd/mr-7/round-1/api/state", "{nope")
     assert status == 400
+
+
+def test_concurrent_posts_all_succeed(served):
+    port, d = served
+
+    def post(i):
+        body = json.dumps(
+            {"findings": {"f1": {"disposition": "post", "note": f"n{i}", "note_rev": 1}}}
+        )
+        return request(port, "POST", "/proj-abcd/mr-7/round-1/api/state", body)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(post, range(8)))
+
+    assert all(status == 200 for status, _ in results)
+    saved = json.loads((d / "state.json").read_text())
+    assert saved["findings"]["f1"]["note"].startswith("n")

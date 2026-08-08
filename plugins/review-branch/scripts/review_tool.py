@@ -618,6 +618,9 @@ INDEX_TEMPLATE = """<!doctype html>
 """
 
 
+_STATE_WRITE_LOCK = threading.Lock()
+
+
 def index_html(root: Path) -> str:
     rows = []
     tomls = sorted(
@@ -715,11 +718,16 @@ class ReviewHandler(BaseHTTPRequestHandler):
             return self._json(400, {"error": "invalid json"})
         if not isinstance(payload, dict) or not isinstance(payload.get("findings"), dict):
             return self._json(400, {"error": 'expected {"findings": {...}}'})
-        payload["updated_at"] = datetime.now(UTC).isoformat()
-        (d / "state.json").write_text(json.dumps(payload, indent=2) + "\n")
-        (d / "review.html").write_text(render_html(d, served=False))
-        data_commit(f"{parts[0]} {parts[1]} {parts[2]}: state update")
-        return self._json(200, {"ok": True, "token": version_token(d)})
+        try:
+            with _STATE_WRITE_LOCK:
+                payload["updated_at"] = datetime.now(UTC).isoformat()
+                (d / "state.json").write_text(json.dumps(payload, indent=2) + "\n")
+                (d / "review.html").write_text(render_html(d, served=False))
+                data_commit(f"{parts[0]} {parts[1]} {parts[2]}: state update")
+                token = version_token(d)
+            return self._json(200, {"ok": True, "token": token})
+        except Exception as e:
+            return self._json(500, {"error": str(e)})
 
 
 def make_server(port: int, root: Path | None = None) -> ThreadingHTTPServer:
