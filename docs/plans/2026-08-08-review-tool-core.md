@@ -2741,6 +2741,49 @@ git commit -m "Rewrite review-branch skill around review_tool and central store"
 
 ---
 
+### Task 14: Dogfood: review this branch with the new tool
+
+**Files:**
+- Create: nothing in the repo (artifacts land in the central review store)
+
+**Interfaces:**
+- Consumes: the entire shipped skill and CLI (Tasks 1-13).
+
+This task is the acceptance test and is run by the controller session itself,
+not a transcription subagent: invoke the rewritten review-branch skill
+end-to-end against this branch and hand Ted the served review to evaluate.
+
+- [ ] **Step 1: Preconditions**
+
+All prior tasks complete, working tree clean, `just test` green,
+`review-branch install` has been run (Step 0 of the skill covers this).
+
+- [ ] **Step 2: Run the review**
+
+Invoke the review-branch skill with the branch name `review-tool-core` as
+input. The repo's remote is GitHub but the branch has no PR, so this
+exercises branch mode: diff against `origin/main` (or local `main` if the
+branch is not pushed), no prior comments, no posting. The full pipeline
+runs: `init`, worktree, lens dispatch, incremental review.toml, diagram,
+`render`, `open`.
+
+- [ ] **Step 3: Verify the artifacts**
+
+- Round dir exists under the data root with review.toml, diagram asset,
+  review.html.
+- `review-branch status` returns merged findings from all four lenses.
+- The served URL loads; cards show tri-state controls; toggling a
+  disposition in the browser writes state.json and produces a
+  `... : state update` commit in the review store git log.
+- The data-root git log shows the render commit.
+
+- [ ] **Step 4: Report**
+
+Give Ted the URL, the severity summary, and the on-disk paths. Leave the
+daemon running and the worktree in place. Do not post anything anywhere.
+
+---
+
 ## Execution notes
 
 - Tasks are strictly ordered; each leaves `just test` green.
