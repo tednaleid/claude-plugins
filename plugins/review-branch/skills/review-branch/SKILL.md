@@ -1,18 +1,36 @@
 ---
 name: review-branch
-description: Deep multi-lens review of an MR, PR, or any local branch. Dispatches 4 parallel subagents (architecture, security, test coverage, naming/API) inside an isolated worktree, aggregates findings with severity tags, and writes a dark-themed HTML disposition tracker (with checkboxes and localStorage) plus copy-paste comment drafts to .llm/reviews/. Nothing auto-posts; the human reviews and posts by hand. Use when asked to deeply review an MR/PR, do a thorough code review of a branch, get a second opinion on changes, or uses /review-branch. Works against GitLab (glab) and GitHub (gh); auto-detects from the git remote. Also handles local-only branch reviews (no MR/PR yet) by diffing against the default branch.
-allowed-tools: Bash(git *), Bash(glab *), Bash(gh *), Bash(jq *), Bash(mkdir *), Bash(test *), Bash(ls *), Bash(open *), Read, Write, Edit, Glob, Grep, Agent, Skill
+description: Deep multi-lens review of an MR, PR, or any local branch. Dispatches 4 parallel subagents (architecture, security, test coverage, naming/API) inside an isolated worktree, writes structured findings to a central review store, and serves a collaborative HTML tracker from a local daemon with tri-state dispositions, editable comment drafts, and notes to Claude that round-trip so checked comments can be posted via the glab-comment or gh-comment skills when explicitly asked. Use when asked to deeply review an MR/PR, do a thorough code review of a branch, get a second opinion on changes, or uses /review-branch. Works against GitLab (glab) and GitHub (gh); auto-detects from the git remote. Also handles local-only branch reviews (no MR/PR yet) by diffing against the default branch.
+allowed-tools: Bash(git *), Bash(glab *), Bash(gh *), Bash(jq *), Bash(mkdir *), Bash(test *), Bash(ls *), Bash(open *), Bash(review-branch *), Bash(*review_tool.py *), Read, Write, Edit, Glob, Grep, Agent, Skill
 ---
 
 # review-branch
 
-Produce a deep, multi-lens code review as a self-contained HTML disposition tracker. Nothing posts to GitLab/GitHub -- the human reviews and copies comments by hand.
+Produce a deep, multi-lens code review as structured data rendered into a
+collaborative HTML tracker. Findings live in `review.toml`; the human marks
+dispositions, edits drafts, and leaves notes in the served page; posting to
+the MR/PR happens only through the glab-comment or gh-comment skills and only
+when explicitly asked.
 
 ## Workflow
 
 ```
-PARSE INPUT --> DETECT VCS --> RESOLVE BRANCH + SLUG --> WORKTREE --> SEED CONTEXT
-            --> DISPATCH 4 LENSES (parallel) --> AGGREGATE --> RENDER HTML --> REPORT
+BOOTSTRAP TOOL --> PARSE INPUT --> DETECT VCS --> RESOLVE BRANCH + INIT ROUND
+  --> WORKTREE --> SEED CONTEXT --> DISPATCH 4 LENSES (parallel)
+  --> WRITE review.toml --> DIAGRAM --> RENDER + OPEN --> REPORT
+```
+
+## Step 0: Bootstrap the tool
+
+```bash
+review-branch --version 2>/dev/null
+```
+
+If the command is missing or prints a version lower than the plugin's copy
+(`"${CLAUDE_PLUGIN_ROOT}/scripts/review_tool.py" --version`), run:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT}/scripts/review_tool.py" install
 ```
 
 ## Step 1: Parse input
@@ -21,7 +39,7 @@ The skill accepts one optional argument. Determine shape:
 
 | Input | Meaning |
 |---|---|
-| digits only (e.g., `124`) | MR/PR number -- VCS picked in Step 2 |
+| digits only (e.g., `124`) | MR/PR number; VCS picked in Step 2 |
 | URL containing `/merge_requests/<n>` | GitLab MR; extract `<n>` |
 | URL containing `/pull/<n>` | GitHub PR; extract `<n>` |
 | anything else | branch name; use directly |
@@ -29,8 +47,8 @@ The skill accepts one optional argument. Determine shape:
 
 Error early if:
 
-- Current branch is `main`, `master`, or `trunk` and no argument was given -- there's nothing to review.
-- The argument is a number but no remote is detected (Step 2 returns local-only) -- ambiguous, ask the user.
+- Current branch is `main`, `master`, or `trunk` and no argument was given.
+- The argument is a number but Step 2 detects no remote; ask the user.
 
 ## Step 2: Detect VCS
 
@@ -43,11 +61,10 @@ case "$remote" in
 esac
 ```
 
-If `vcs="local"` and the input is a branch name or empty, proceed in **local mode** -- no MR/PR metadata, no prior comments. Diff is against `origin/<default-branch>` (see Step 3).
+Local mode: no MR/PR metadata, no prior comments; diff against
+`origin/<default-branch>`.
 
-## Step 3: Resolve branch and slug
-
-### Resolve the source branch and metadata
+## Step 3: Resolve branch, slug, and round directory
 
 | Input shape | VCS | Source branch |
 |---|---|---|
@@ -56,63 +73,29 @@ If `vcs="local"` and the input is a branch name or empty, proceed in **local mod
 | branch name | any | the input |
 | (none) | any | `git rev-parse --abbrev-ref HEAD` |
 
-Also fetch the target branch:
+Target branch: MR `.target_branch`; PR `--json baseRefName`; local
+`git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'`.
 
-- MR: `.target_branch` from the same `glab mr view --output json` call.
-- PR: `--json baseRefName --jq .baseRefName`.
-- Local mode: `git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'`.
+Slug: `mr-<n>`, `pr-<n>`, or the branch name through
+`tr '/' '-' | tr -c 'a-zA-Z0-9-' '-'` with leading/trailing dashes trimmed.
 
-### Build the slug
-
-- MR mode: `mr-<n>`
-- PR mode: `pr-<n>`
-- Branch mode: slugify the branch name -- `tr '/' '-' | tr -c 'a-zA-Z0-9-' '-'`. Trim leading/trailing dashes.
-
-### Decide the output filename
-
-Output goes to `.llm/reviews/<slug>-review.html`. Check whether prior reviews exist for this slug:
+Create the round directory (run from the main repo, before entering the
+worktree) and capture its absolute path:
 
 ```bash
-mkdir -p .llm/reviews
-existing=$(ls .llm/reviews/<slug>-review*.html 2>/dev/null | wc -l | tr -d ' ')
-case "$existing" in
-  0) out=".llm/reviews/<slug>-review.html" ;;
-  *) round=$((existing + 1)); out=".llm/reviews/<slug>-review-${round}.html" ;;
-esac
+REVIEW_DIR=$(review-branch init --slug <slug>)
 ```
-
-The `{{LOCAL_STORAGE_KEY}}` for the HTML is the output basename without `.html`, plus `-checks-v1`. Example: `mr-124-review-2-checks-v1`.
 
 ## Step 4: Worktree
 
-The skill operates inside an isolated git worktree of the source branch. Subagents read source files and run tests from there.
-
-**Preferred:** invoke the `worktree` skill via the `Skill` tool with the resolved source branch (or MR/PR number) as input. It handles branch resolution, env-file copy, env bootstrap, and the `EnterWorktree` call.
-
-```
-Skill(skill: "worktree", args: "<source-branch-or-mr-pr-number>")
-```
-
-**Fallback** (if `worktree` skill isn't available in the user's plugin set): perform the inline equivalent yourself:
-
-```bash
-mkdir -p .claude/worktrees
-git fetch origin
-dir=$(echo "<source-branch>" | tr '/' '-')
-git worktree add .claude/worktrees/$dir origin/<source-branch> \
-  || git worktree add .claude/worktrees/$dir <source-branch>
-# copy gitignored env files (.env*, .envrc) from main worktree
-# bootstrap with direnv allow OR uv sync / bun install / pnpm install / npm install
-# call EnterWorktree(path: .claude/worktrees/$dir)
-```
-
-After this step, your working directory is the worktree. All file reads in subsequent steps use the worktree as the repo root.
+Invoke the `worktree` skill via the `Skill` tool with the resolved source
+branch (or MR/PR number). It handles branch resolution, env-file copy,
+bootstrap, and `EnterWorktree`. Fall back to the inline equivalent from that
+skill's documentation only if the skill is unavailable.
 
 ## Step 5: Seed context
 
-Build the inputs the lens subagents need. Write them to files in the worktree's `.llm/` (or `/tmp/` if `.llm/` isn't writable) so subagents can read them.
-
-### Diff and changed files
+Ephemeral scratch goes in the worktree's `.llm/` (never in `$REVIEW_DIR`).
 
 ```bash
 case "$vcs" in
@@ -123,9 +106,7 @@ esac
 grep '^diff --git' .llm/diff.patch | awk '{print $4}' | sed 's@^b/@@' > .llm/changed-files.txt
 ```
 
-### Prior comments (MR/PR mode only)
-
-See `references/glab.md` and `references/gh.md` for the exact commands. The simplest output that lens prompts can consume is the human-readable markdown form:
+Prior comments (MR/PR mode only; see `references/glab.md` / `references/gh.md`):
 
 ```bash
 case "$vcs" in
@@ -143,112 +124,107 @@ case "$vcs" in
 esac
 ```
 
-Skip this step in local mode -- there are no prior comments. Note this for the lens prompts ("no prior discussion to consider").
-
-### Hex detection
+Hex detection:
 
 ```bash
-hex_doc=""
-hex_mode="false"
+hex_doc=""; hex_mode="false"
 test -f docs/hexagonal-architecture.md && { hex_doc="docs/hexagonal-architecture.md"; hex_mode="true"; }
 test -d core/ports && hex_mode="true"
 test -d src/core/ports && hex_mode="true"
 ```
 
-Pass `hex_mode` and `hex_doc` to the architecture lens prompt.
-
-### Spec detection (optional, helpful)
-
-If the branch name matches a ticket pattern (e.g., `OMNI-15209`, `JIRA-1234`), look for `docs/specs/<TICKET>*.md` or `docs/spec/<TICKET>*.md`. If found, pass the path as `spec_path` to the coverage lens.
-
-```bash
-ticket=$(echo "<source-branch>" | grep -oE '[A-Z]+-[0-9]+' | head -1)
-[ -n "$ticket" ] && spec=$(ls docs/spec*/${ticket}*.md 2>/dev/null | head -1)
-```
+Spec detection: if the branch matches a ticket pattern (`[A-Z]+-[0-9]+`),
+look for `docs/spec*/<TICKET>*.md` and pass it to the coverage lens.
 
 ## Step 6: Dispatch lenses (parallel)
 
-Use the `Agent` tool to spawn all 4 lens subagents **in a single message** so they run in parallel. Each gets a prompt with the seed context.
+Spawn all 4 lens subagents in a single message. Each prompt carries:
+worktree_path, target_branch, diff_path, changed_files, prior_comments_path
+(or `none`), hex_mode, hex_doc, spec_path, plus instructions to read
+`references/agent-contract.md` and its own `agents/lens-*.md` prompt, and to
+return a JSON array per the contract. Lenses: `review-branch:lens-architecture`,
+`review-branch:lens-security`, `review-branch:lens-coverage`,
+`review-branch:lens-naming`.
 
+If a subagent returns malformed JSON, retry once; if it still fails, log the
+lens as "no findings" and continue.
+
+## Step 7: Aggregate into review.toml
+
+Dedupe: same file + line range within 5 lines + same topic (>= 50% word
+overlap in title) merge into one entry, keeping highest severity, the most
+specific description, concatenated distinct drafts, unioned lenses. Sort by
+severity (high, med, low, info), then file path, then line. Ids: `f1`, `f2`,
+... in final order.
+
+Write `$REVIEW_DIR/review.toml` incrementally per `references/data-format.md`:
+
+1. First `Write`: the `[review]` table, `[overall]`, and any `[[hex]]`,
+   `[[coverage]]`, `[[files_touched]]` rows.
+2. Then append findings in batches (one `Edit` per lens's merged findings).
+   Never emit the whole document in one tool call.
+
+Every finding that warrants an MR/PR comment gets a `comment` draft (tone per
+`references/agent-contract.md`) and an `anchor` on a line the diff touches.
+Context-only findings get `commentable = false`.
+
+## Step 8: Diagram
+
+Pick the diagram type per `references/diagrams.md`, author the SVG file(s)
+into `$REVIEW_DIR`, and add `[[assets]]` entries. Skip only for trivial
+branches.
+
+## Step 9: Render and open
+
+```bash
+review-branch render "$REVIEW_DIR"
+review-branch open "$REVIEW_DIR"
 ```
-Agent(
-  subagent_type: "review-branch:lens-architecture",
-  description: "Architecture lens",
-  prompt: """
-    worktree_path: <absolute path to worktree>
-    target_branch: <e.g., main>
-    diff_path: <absolute path to .llm/diff.patch>
-    changed_files: <newline-joined list>
-    prior_comments_path: <absolute path or 'none' if local mode>
-    hex_mode: <true|false>
-    hex_doc: <path or empty>
-    spec_path: <path or empty>
 
-    Read references/agent-contract.md for the output schema and tone.
-    Read this lens's full prompt at agents/lens-architecture.md.
-    Return JSON array per the contract.
-  """
-)
-```
+`open` prints the review URL. Offer to open it in the browser:
+`open <url>` (macOS).
 
-Repeat for `lens-security`, `lens-coverage`, `lens-naming`. Send all four `Agent` calls in one assistant turn -- this is the parallel dispatch.
+## Step 10: Report
 
-Each subagent returns a JSON array of findings. Parse each one. If a subagent returns malformed JSON, retry once with a clarifying prompt; if it still fails, log the lens as "no findings" and continue.
+1. The review URL (and the on-disk fallback `$REVIEW_DIR/review.html`).
+2. Summary line: counts per severity.
+3. How the collaboration works, in one line: mark Post/Skip, edit drafts,
+   leave notes; then ask to post and the comment skills take it from there.
+4. Worktree cleanup command: `git worktree remove <worktree-path>`.
 
-## Step 7: Aggregate
+Stop after this. Do not summarize again or offer to refine.
 
-Combine the four arrays. Dedupe overlapping findings:
+## After the human reviews (the collaboration loop)
 
-- Same `file` + line range within 5 lines + same general topic (≥50% word overlap in the title) -> merge into one entry.
-- When merging: pick the highest severity, keep the most specific description, concatenate distinct `draft_comment` bodies, and union the lens labels.
+Read state with `review-branch status "$REVIEW_DIR"`. The human's phrasing
+picks the mode:
 
-Sort the merged list:
-
-1. Primary: severity (`high` -> `med` -> `low` -> `info`).
-2. Secondary: file path (groups findings touching the same file together).
-3. Tertiary: line number ascending within a file.
-
-Number them sequentially (`f1`, `f2`, ...) in this final order. The corresponding draft comments get `c1`, `c2`, ... matching the finding numbers they came from.
-
-## Step 8: Render HTML
-
-Read `assets/template.html`. Follow `references/html-template.md` to substitute every `{{...}}` placeholder. Key substitutions:
-
-- `{{TITLE}}` (appears twice -- use `replace_all: true`): `<MR/PR/Branch> review -- <title-or-branch-name>`. E.g. `MR 124 review -- OMNI-15209 per-repo starting refs`.
-- `{{SUBTITLE}}`: one-line description. E.g. `Code review notes for <user> to use when commenting on the MR. Author: <author>.`
-- `{{META_ROW}}`: spans per `references/html-template.md#meta-row`.
-- `{{SUMMARY_GRID}}`: count cards. Always include High and Med (even if 0); include Low/Info only if non-zero.
-- `{{OVERALL_BODY}}`: 1-2 paragraphs. Frame the change in plain language; list the headline asks (top 1-3 findings by severity).
-- `{{FINDINGS_BODY}}`: every finding rendered as a `<div class="finding ...">` block per template.
-- `{{HEX_TABLE_BLOCK}}`: empty string if `hex_mode=false`; otherwise the H2 + table per template.
-- `{{COVERAGE_TABLE_BLOCK}}`: always present. Build the surface/covered/gap rows from the coverage lens findings + reading the test files in the diff.
-- `{{FILES_TABLE_BLOCK}}`: from the diff's per-file +/- counts; cross-reference finding numbers.
-- `{{COMMENTS_BLOCK}}`: `comment-block` div per draft comment, with matching `data-cid` / checkbox `data-id`.
-- `{{LOCAL_STORAGE_KEY}}`: derived from output filename per Step 3.
-
-Write the final HTML with `Write` (single call, full file). HTML-escape all user content (`<`, `>`, `&`).
-
-## Step 9: Report
-
-Print to the user:
-
-1. **Absolute path** of the HTML tracker.
-2. **Open command** (macOS): `open <absolute-path>`.
-3. **Summary line**: counts per severity, e.g., "1 high, 5 medium, 5 low, 3 info -- 14 findings across 12 files."
-4. **Worktree cleanup commands** (the user runs these when done):
-
-   ```
-   git worktree remove <worktree-path>
-   ```
-
-Do not offer to do more. The skill is complete.
+- "update the html for f8": rewrite that finding's `comment` in review.toml
+  (start from their `edited_comment` if present), bump `comment_rev`, run
+  `review-branch render`, done; the served page reloads itself.
+- "show me the edit here": print the revised body in the terminal instead.
+- "post the checked ones" / `/glab-comment` / `/gh-comment`: interpret notes
+  and post through the matching comment skill. A clear note produces a
+  rewrite (bump `comment_rev`, record in review.toml). An ambiguous note, one
+  contradicting the finding, or one that reads as a question holds that
+  finding out of the batch (`--exclude`); post the clear ones and raise the
+  held ones for discussion. `review-branch manifest "$REVIEW_DIR"` emits the
+  batch for the comment skill.
+- After posting: write `posted_at`, `posted_url`, `posted_body` into
+  review.toml, commit message `<rid> <slug> round-N: fN posted`, re-render.
 
 ## Rules and anti-patterns
 
-- **No auto-posting.** Never call `glab mr note`, `gh pr comment`, or any post/edit endpoint on the MR/PR conversation.
-- **No confidence threshold.** Every lens finding lands in the tracker. Severity tags carry the signal; the human dispositions by checking the box.
-- **Read full files end-to-end.** The diff is for navigation only. Don't synthesize findings from grep snippets.
-- **Reproduce when possible.** Subagents should try to confirm suspected bugs by running tests. `reproduced: true` is a much stronger signal than `reproduced: false`.
-- **Worktree stays.** Do not auto-remove it. The user may want to re-run, inspect findings against source, or extend the review manually.
-- **One new file per round.** When re-reviewing after the author pushes new commits, write `-review-2.html`, `-review-3.html`, etc. Never overwrite a prior round.
-- **Stop after Step 9.** Do not summarize again, do not offer to refine, do not start a new review.
+- **No auto-posting.** Posting happens only through the glab-comment or
+  gh-comment skills, and only when explicitly asked. Never call `glab mr
+  note`, `gh pr comment`, or raw discussion/review-comment endpoints.
+- **Findings are append-only.** Never delete or renumber a finding within a
+  round; a wrong finding gets disposition Skip. A re-review after new pushes
+  is a new round: `review-branch init` again.
+- **review.toml is yours; state.json is not.** Never write state.json; the
+  daemon owns it.
+- **No confidence threshold.** Every lens finding lands in the tracker.
+- **Read full files end-to-end.** The diff is for navigation only.
+- **Reproduce when possible.** `reproduced: true` is a much stronger signal.
+- **Worktree stays.** Do not auto-remove it.
+- **Stop after Step 10.**

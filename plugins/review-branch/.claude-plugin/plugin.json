@@ -1,7 +1,7 @@
 {
   "name": "review-branch",
-  "version": "0.1.0",
-  "description": "Deep multi-lens review of an MR, PR, or any local branch. Dispatches 4 parallel subagents (architecture, security, test coverage, naming/API) inside an isolated worktree, aggregates findings with severity tags, and writes a dark-themed HTML disposition tracker (with checkboxes and localStorage) plus copy-paste comment drafts to .llm/reviews/. Nothing auto-posts; the human reviews and posts by hand. Works against GitLab (glab) and GitHub (gh); auto-detects from the git remote.",
+  "version": "0.2.0",
+  "description": "Deep multi-lens review of an MR, PR, or any local branch. Dispatches 4 parallel subagents (architecture, security, test coverage, naming/API) inside an isolated worktree, writes structured findings to a central review store, and serves a collaborative HTML tracker from a local daemon with tri-state dispositions, editable comment drafts, and notes to Claude. Nothing auto-posts; posting happens through companion comment skills only when explicitly asked. Works against GitLab (glab) and GitHub (gh); auto-detects from the git remote.",
   "author": {
     "name": "Ted Naleid"
   },
