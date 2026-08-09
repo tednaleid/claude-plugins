@@ -33,6 +33,9 @@ If the command is missing or prints a version lower than the plugin's copy
 "${CLAUDE_PLUGIN_ROOT}/scripts/review_tool.py" install
 ```
 
+This also installs `glab-comment` and `gh-comment` to `~/.local/bin`, the
+scripts the glab-comment and gh-comment skills call to post.
+
 ## Step 1: Parse input
 
 The skill accepts one optional argument. Determine shape:

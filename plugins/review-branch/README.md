@@ -27,8 +27,9 @@ default), edit the comment drafts directly, and leave free-text notes
 the daemon and every change is committed to a git repo at the review store
 root. When you ask
 Claude to post, it interprets your notes, rewrites where asked, and posts the
-checked comments through the glab-comment or gh-comment skill with the From
-Claude attribution marker.
+checked comments via `glab-comment` (GitLab) or `gh-comment` (GitHub),
+chosen by the remote, only when explicitly asked, with the From Claude
+attribution marker.
 
 The page has vim-ish keyboard nav (j/k or the arrow keys move a highlighted
 finding, space toggles its Post checkbox, Enter folds it and moves on, z
@@ -42,8 +43,8 @@ claude plugin install review-branch@tednaleid
 claude plugin install worktree@tednaleid       # recommended companion
 ```
 
-The skill installs the `review-branch` CLI to `~/.local/bin` on first use
-(`review_tool.py install`).
+The skill installs `review-branch`, `glab-comment`, and `gh-comment` to
+`~/.local/bin` on first use (`review_tool.py install`).
 
 ## Use
 
