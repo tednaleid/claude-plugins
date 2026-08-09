@@ -5,6 +5,9 @@ import socket
 import subprocess
 import sys
 import threading
+import urllib.request
+
+import pytest
 
 import review_tool
 
@@ -56,6 +59,54 @@ def test_stop_tolerates_garbage_pidfile(env):
     review_tool.pidfile().write_text("garbage")
     assert review_tool.cmd_stop() == 0
     assert not review_tool.pidfile().exists()
+
+
+def test_serve_is_registered_subcommand_not_daemon(capsys):
+    with pytest.raises(SystemExit) as exc:
+        review_tool.main(["bogus"])
+    assert exc.value.code == 2
+    err = capsys.readouterr().err
+    assert "'serve'" in err
+    assert "'daemon'" not in err
+
+
+def test_spawn_daemon_invokes_serve(env, monkeypatch):
+    captured = {}
+
+    class FakeProc:
+        pid = 12345
+
+    def fake_popen(argv, **kwargs):
+        captured["argv"] = argv
+        return FakeProc()
+
+    monkeypatch.setattr(subprocess, "Popen", fake_popen)
+    review_tool.spawn_daemon(43117)
+    assert captured["argv"][-1] == "serve"
+    assert "daemon" not in captured["argv"]
+
+
+def test_cmd_serve_prints_startup_url_and_manages_pidfile(env, monkeypatch, capsys):
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    monkeypatch.setenv("REVIEW_BRANCH_PORT", str(port))
+    t = threading.Thread(target=review_tool.cmd_serve, daemon=True)
+    t.start()
+    try:
+        assert review_tool._wait(lambda: review_tool.health_check(port) is not None)
+        assert review_tool.pidfile().exists()
+        err = capsys.readouterr().err
+        assert f"http://127.0.0.1:{port}/" in err
+        assert "Ctrl-C to stop" in err
+    finally:
+        req = urllib.request.Request(f"http://127.0.0.1:{port}/api/shutdown", method="POST", data=b"")
+        try:
+            urllib.request.urlopen(req, timeout=2)
+        except Exception:
+            pass
+        t.join(timeout=5)
+        assert not review_tool.pidfile().exists()
 
 
 def test_open_spawns_daemon_on_dead_port(env, monkeypatch, capsys):

@@ -32,7 +32,7 @@ __version__ = "0.2.0"
 APP_NAME = "review-branch"
 DEFAULT_PORT = 43117
 
-SUBCOMMANDS = ("init", "render", "open", "status", "manifest", "install", "daemon", "stop")
+SUBCOMMANDS = ("init", "render", "open", "status", "manifest", "install", "serve", "stop")
 
 
 def data_root() -> Path:
@@ -917,7 +917,7 @@ def spawn_daemon(port: int) -> None:
     state_root().mkdir(parents=True, exist_ok=True)
     log = (state_root() / "daemon.log").open("a")
     subprocess.Popen(
-        [sys.executable, str(Path(__file__).resolve()), "daemon"],
+        [sys.executable, str(Path(__file__).resolve()), "serve"],
         stdout=log,
         stderr=log,
         stdin=subprocess.DEVNULL,
@@ -957,10 +957,15 @@ def cmd_open(round_dir: Path) -> str:
     return f"http://127.0.0.1:{port}/{route}/"
 
 
-def cmd_daemon() -> int:
-    server = make_server(current_port())
+def cmd_serve() -> int:
+    port = current_port()
+    server = make_server(port)
     state_root().mkdir(parents=True, exist_ok=True)
     pidfile().write_text(str(os.getpid()))
+    print(
+        f"review-branch serving all reviews at http://127.0.0.1:{port}/  (Ctrl-C to stop)",
+        file=sys.stderr,
+    )
     try:
         server.serve_forever()
     finally:
@@ -1035,7 +1040,7 @@ def main(argv: list[str] | None = None) -> int:
     p_manifest = sub._name_parser_map["manifest"]
     p_manifest.add_argument("--exclude", default="")
     sub.add_parser("install", help="copy scripts to the bin dir")
-    sub.add_parser("daemon", help="run the server in the foreground")
+    sub.add_parser("serve", help="run the server in the foreground")
     sub.add_parser("stop", help="stop the daemon via pidfile")
 
     args = parser.parse_args(argv)
@@ -1060,8 +1065,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "install":
         return cmd_install()
-    if args.command == "daemon":
-        return cmd_daemon()
+    if args.command == "serve":
+        return cmd_serve()
     if args.command == "stop":
         return cmd_stop()
     print(f"{args.command}: not implemented", file=sys.stderr)
