@@ -417,9 +417,9 @@ TEMPLATE = """<!doctype html>
   .file { color: var(--muted); font-family: var(--mono); font-size: 12px; }
   .control-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
   .fold-toggle { appearance: none; -webkit-appearance: none; background: none; border: 1px solid transparent;
-                 color: var(--muted); cursor: pointer; width: 22px; height: 22px; border-radius: 4px;
+                 color: var(--muted); cursor: pointer; width: 24px; height: 24px; border-radius: 4px;
                  display: inline-flex; align-items: center; justify-content: center; padding: 0; }
-  .fold-toggle::before { content: "\\25be"; font-size: 11px; }
+  .fold-toggle::before { content: "\\25be"; font-size: 16px; line-height: 1; }
   .finding.collapsed .fold-toggle::before { content: "\\25b8"; }
   .fold-toggle:hover { color: var(--text); border-color: var(--border); background: var(--panel2); }
   .collapse-body { margin-top: 8px; }
