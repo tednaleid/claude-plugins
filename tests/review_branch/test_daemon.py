@@ -177,6 +177,85 @@ def test_matching_origin_post_succeeds(env, monkeypatch):
         srv.shutdown()
 
 
+def test_preview_renders_markdown_to_html(served):
+    port, d = served
+    body = json.dumps({"markdown": "has `x`"})
+    status, data = request(port, "POST", "/proj-abcd/mr-7/round-1/api/preview", body)
+    assert status == 200
+    resp = json.loads(data)
+    assert "<code>x</code>" in resp["html"]
+    assert not (d / "state.json").exists()
+
+
+def test_preview_escapes_raw_html(served):
+    port, _ = served
+    body = json.dumps({"markdown": "<script>alert(1)</script>"})
+    status, data = request(port, "POST", "/proj-abcd/mr-7/round-1/api/preview", body)
+    assert status == 200
+    resp = json.loads(data)
+    assert "<script>" not in resp["html"]
+    assert "&lt;script&gt;" in resp["html"]
+
+
+def test_preview_bad_origin_403(served):
+    port, _ = served
+    body = json.dumps({"markdown": "x"})
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    conn.request(
+        "POST",
+        "/proj-abcd/mr-7/round-1/api/preview",
+        body=body,
+        headers={"Content-Type": "application/json", "Origin": "https://evil.example"},
+    )
+    resp = conn.getresponse()
+    status = resp.status
+    resp.read()
+    conn.close()
+    assert status == 403
+
+
+def test_preview_bad_json_400(served):
+    port, _ = served
+    status, _ = request(port, "POST", "/proj-abcd/mr-7/round-1/api/preview", "{nope")
+    assert status == 400
+
+
+def test_preview_unknown_route_404(served):
+    port, _ = served
+    status, _ = request(port, "POST", "/nope/mr-1/round-1/api/preview", json.dumps({"markdown": "x"}))
+    assert status == 404
+
+
+def test_preview_matching_origin_succeeds(env, monkeypatch):
+    # Same REVIEW_BRANCH_PORT/Origin coupling as test_matching_origin_post_succeeds:
+    # current_port() must agree with the bound port for the Origin check to pass.
+    d = review_tool.data_root() / "proj-abcd" / "mr-7" / "round-1"
+    d.mkdir(parents=True)
+    (d / "review.toml").write_text(REVIEW_TOML)
+    srv = review_tool.make_server(0)
+    thread = threading.Thread(target=srv.serve_forever, daemon=True)
+    thread.start()
+    try:
+        port = srv.server_address[1]
+        monkeypatch.setenv("REVIEW_BRANCH_PORT", str(port))
+        body = json.dumps({"markdown": "has `x`"})
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        conn.request(
+            "POST",
+            "/proj-abcd/mr-7/round-1/api/preview",
+            body=body,
+            headers={"Content-Type": "application/json", "Origin": f"http://127.0.0.1:{port}"},
+        )
+        resp = conn.getresponse()
+        status = resp.status
+        data = resp.read().decode()
+        conn.close()
+        assert status == 200
+        assert "<code>x</code>" in json.loads(data)["html"]
+    finally:
+        srv.shutdown()
+
+
 def test_concurrent_posts_all_succeed(served):
     port, d = served
 

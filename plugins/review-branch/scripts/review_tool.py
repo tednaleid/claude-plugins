@@ -852,7 +852,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
             threading.Thread(target=self.server.shutdown).start()
             return self._json(200, {"ok": True})
         parts = [p for p in path.split("/") if p]
-        if len(parts) != 5 or parts[3:] != ["api", "state"]:
+        if len(parts) != 5 or parts[3] != "api" or parts[4] not in ("state", "preview"):
             return self._json(404, {"error": "unknown endpoint"})
         d = self._round_dir(parts[:3])
         if d is None:
@@ -862,6 +862,10 @@ class ReviewHandler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length))
         except json.JSONDecodeError:
             return self._json(400, {"error": "invalid json"})
+        if parts[4] == "preview":
+            if not isinstance(payload, dict) or not isinstance(payload.get("markdown"), str):
+                return self._json(400, {"error": 'expected {"markdown": "..."}'})
+            return self._json(200, {"html": md_html(payload["markdown"])})
         if not isinstance(payload, dict) or not isinstance(payload.get("findings"), dict):
             return self._json(400, {"error": 'expected {"findings": {...}}'})
         if not all(isinstance(v, dict) for v in payload["findings"].values()):
