@@ -8,7 +8,7 @@
 
 import argparse
 import fnmatch
-import os
+import json
 import subprocess
 import sys
 import tomllib
@@ -18,8 +18,13 @@ ENV_GLOBS = (".env", ".env.*", ".envrc")
 
 
 def run(cwd, *args, check=True, capture=True):
-    out = subprocess.run(list(args), cwd=str(cwd), text=True,
-                         capture_output=capture, check=False)
+    try:
+        out = subprocess.run(list(args), cwd=str(cwd), text=True,
+                             capture_output=capture, check=False)
+    except FileNotFoundError:
+        if check:
+            raise SystemExit(f"{args[0]} not found")
+        return subprocess.CompletedProcess(list(args), 127, "", f"{args[0]}: not found")
     if check and out.returncode != 0:
         err = out.stderr.strip() if capture else ""
         raise SystemExit(f"{' '.join(args)} failed: {err}")
@@ -76,7 +81,6 @@ def resolve_branch(arg, vcs, repo_root):
     if text.isdigit():
         if vcs == "glab":
             out = run(repo_root, "glab", "mr", "view", text, "--output", "json")
-            import json
             return json.loads(out.stdout)["source_branch"]
         if vcs == "gh":
             out = run(repo_root, "gh", "pr", "view", text,
@@ -120,8 +124,28 @@ def copy_env_files(repo_root, dest):
 
 
 def parent_direnv_allowed(repo_root):
-    out = run(repo_root, "direnv", "status", check=False)
-    return "Found RC allowed true" in out.stdout
+    """True only when direnv confirms the parent .envrc is allowed.
+
+    This gates whether we run `direnv allow` on the new worktree's .envrc, so
+    it fails closed: any parse failure, missing .envrc, or unrecognized
+    status returns False rather than risk auto-allowing an untrusted file.
+
+    direnv's JSON status reports state.foundRC.allowed as an enum (0 allowed,
+    1 not allowed, 2 denied); older direnv's text output instead printed
+    "Found RC allowed true"/"false". Prefer JSON; fall back to text matching
+    both the old boolean form and the new enum's allowed value.
+    """
+    out = run(repo_root, "direnv", "status", "--json", check=False)
+    if out.returncode == 0:
+        try:
+            found_rc = json.loads(out.stdout)["state"]["foundRC"]
+        except (json.JSONDecodeError, KeyError, TypeError):
+            return False
+        if not isinstance(found_rc, dict):
+            return False
+        return found_rc.get("allowed") == 0
+    text = run(repo_root, "direnv", "status", check=False).stdout
+    return "Found RC allowed true" in text or "Found RC allowed 0" in text
 
 
 def bootstrap(repo_root, dest):

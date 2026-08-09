@@ -53,7 +53,7 @@ the user's say-so.
 
 When the user is done:
 
-1. `EnterWorktree` with `action: "keep"` to return to the original directory (or just
+1. `ExitWorktree` with `action: "keep"` to return to the original directory (or just
    `cd` back).
 2. `git worktree remove .claude/worktrees/<slug>`
 3. If the script created a brand-new local branch (target did not exist anywhere), delete it
