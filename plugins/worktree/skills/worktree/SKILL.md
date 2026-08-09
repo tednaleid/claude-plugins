@@ -15,7 +15,7 @@ standalone script; this skill runs it and enters the result.
    branch name; omit for the current branch):
 
    ```bash
-   "${CLAUDE_PLUGIN_ROOT}/scripts/worktree_tool.py" <target>
+   "${CLAUDE_PLUGIN_ROOT}/scripts/worktree_tool.py" create <target>
    ```
 
    It resolves the branch, creates the worktree under `.claude/worktrees/<slug>`, copies

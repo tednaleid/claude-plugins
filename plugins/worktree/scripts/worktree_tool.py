@@ -3,12 +3,13 @@
 # requires-python = ">=3.12"
 # ///
 
-# ABOUTME: creates a git worktree under .claude/worktrees and bootstraps it
-# ABOUTME: copies gitignored env files, runs direnv/lockfile setup, applies .worktree.toml hooks
+# ABOUTME: `wt` CLI to manage git worktrees under .claude/worktrees (create/list/remove/install)
+# ABOUTME: create bootstraps env files, direnv/lockfile setup, and .worktree.toml hooks
 
-import argparse
 import fnmatch
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -186,17 +187,14 @@ def apply_hooks(repo_root, dest, hooks):
     return applied
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Create and bootstrap a git worktree under .claude/worktrees/."
-    )
-    parser.add_argument("target", nargs="?",
-                        help="MR/PR number, MR/PR URL, or branch name (default: current branch)")
-    args = parser.parse_args()
+def repo_root_cwd():
+    return run(Path.cwd(), "git", "rev-parse", "--show-toplevel").stdout.strip()
 
-    repo_root = run(Path.cwd(), "git", "rev-parse", "--show-toplevel").stdout.strip()
+
+def cmd_create(args, repo_root):
+    target = args[0] if args else None
     vcs = detect_vcs(repo_root)
-    branch = resolve_branch(args.target, vcs, repo_root)
+    branch = resolve_branch(target, vcs, repo_root)
     dest = Path(repo_root) / ".claude" / "worktrees" / slug_dir(branch)
     if dest.exists():
         raise SystemExit(f"worktree already exists: {dest}")
@@ -214,6 +212,141 @@ def main():
         summary.append("hooks: " + ", ".join(applied))
     print("  " + " | ".join(summary), file=sys.stderr)
     return 0
+
+
+def parse_worktrees(porcelain):
+    """Parse `git worktree list --porcelain` into [{path, head, branch}]."""
+    entries = []
+    current = {}
+    for line in porcelain.splitlines():
+        if not line:
+            if current:
+                entries.append(current)
+                current = {}
+            continue
+        if line.startswith("worktree "):
+            current = {"path": line[len("worktree "):], "head": "", "branch": "(detached)"}
+        elif line.startswith("HEAD "):
+            current["head"] = line[len("HEAD "):][:8]
+        elif line.startswith("branch "):
+            current["branch"] = line[len("branch "):].removeprefix("refs/heads/")
+    if current:
+        entries.append(current)
+    return entries
+
+
+def match_worktrees(entries, terms):
+    """Keep entries where every term is a substring of the path or branch."""
+    return [e for e in entries
+            if all(t in f"{e['path']} {e['branch']}" for t in terms)]
+
+
+def list_worktrees(repo_root):
+    out = run(repo_root, "git", "worktree", "list", "--porcelain")
+    return parse_worktrees(out.stdout)
+
+
+def cmd_list(args, repo_root):
+    entries = match_worktrees(list_worktrees(repo_root), args)
+    if not entries:
+        print("no worktrees match" if args else "no worktrees", file=sys.stderr)
+        return 0
+    width = max(len(e["branch"]) for e in entries)
+    for e in entries:
+        print(f"{e['branch']:<{width}}  {e['head']}  {e['path']}")
+    return 0
+
+
+def cmd_remove(args, repo_root):
+    force = "--force" in args or "-f" in args
+    terms = [a for a in args if not a.startswith("-")]
+    main_path = str(Path(repo_root))
+    candidates = [e for e in list_worktrees(repo_root) if e["path"] != main_path]
+    matches = match_worktrees(candidates, terms)
+    if not matches:
+        raise SystemExit(f"no worktree matches {' '.join(terms) or '(empty)'}")
+    if len(matches) > 1:
+        listed = "\n".join(f"  {e['branch']}  {e['path']}" for e in matches)
+        raise SystemExit(f"ambiguous; {len(matches)} worktrees match:\n{listed}")
+    path = matches[0]["path"]
+    cmd = ["git", "worktree", "remove"]
+    if force:
+        cmd.append("--force")
+    cmd.append(path)
+    run(repo_root, *cmd)
+    print(f"removed {path}")
+    return 0
+
+
+def bin_dir():
+    return Path(os.environ.get("WORKTREE_BIN", "~/.local/bin")).expanduser()
+
+
+def cmd_install():
+    dest_dir = bin_dir()
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / "wt"
+    shutil.copy2(Path(__file__).resolve(), dest)
+    dest.chmod(0o755)
+    print(f"installed {dest}")
+    return 0
+
+
+VERBS = ("create", "list", "remove", "install")
+
+
+def resolve(argv):
+    """Map argv to (verb, remaining_args): prefix-matched verbs, `list` default.
+
+    A bare invocation, a leading option, or an unmatched first token all fall
+    through to `list` (with the tokens as filter terms). `--` forces the rest
+    to be list filter terms even when they look like a verb.
+    """
+    if not argv:
+        return "list", argv
+    if argv[0] == "--":
+        return "list", argv[1:]
+    if argv[0].startswith("-"):
+        return "list", argv
+    hits = [v for v in VERBS if v.startswith(argv[0])]
+    if len(hits) == 1:
+        return hits[0], argv[1:]
+    if not hits:
+        return "list", argv
+    raise SystemExit(f"ambiguous verb {argv[0]!r}: {', '.join(hits)}")
+
+
+USAGE = """\
+wt - manage git worktrees under .claude/worktrees/
+
+  wt [list] [filter...]      list worktrees (default), optionally filtered
+  wt create [target]         create+bootstrap a worktree (MR/PR number, URL,
+                             branch name, or current branch)
+  wt remove [--force] <t>    remove the one worktree matching <t>
+  wt install                 copy this script to ~/.local/bin/wt
+
+Verbs prefix-match (wt cr foo == wt create foo). Use `--` to force the rest to
+be a list filter (wt -- create lists worktrees matching "create").
+"""
+
+
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] in ("-h", "--help", "help"):
+        print(USAGE)
+        return 0
+    verb, rest = resolve(argv)
+    if verb == "install":
+        return cmd_install()
+    repo_root = repo_root_cwd()
+    if verb == "create":
+        return cmd_create(rest, repo_root)
+    if verb == "list":
+        return cmd_list(rest, repo_root)
+    if verb == "remove":
+        return cmd_remove(rest, repo_root)
+    print(USAGE, file=sys.stderr)
+    return 2
 
 
 if __name__ == "__main__":
