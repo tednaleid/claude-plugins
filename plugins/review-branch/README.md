@@ -66,3 +66,12 @@ Useful CLI verbs against a round directory: `open` (serve and print URL),
 - Findings are append-only within a round; re-reviews create new rounds;
   comment rewrite history lives in the review store's git log.
 - The worktree is left in place; the skill prints the cleanup command.
+
+## Tests
+
+- `just test` runs the fast suite (no browser required).
+- `just test-ui` runs a committed Playwright suite against a real `serve`
+  daemon, covering the page JS: keyboard nav, fold, click-to-edit, save
+  status, and the CSS glyphs. One-time setup:
+  `uv run --with pytest-playwright playwright install chromium`.
+- `just test-all` runs both.

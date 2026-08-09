@@ -102,6 +102,14 @@ retag plugin version:
     git tag -a "$tag" -F "$notes_file"
     git push && git push --tags
 
-# Run python script tests
+# Run python script tests (fast, no browser)
 test:
-    uv run --python 3.12 --with pytest --with markdown-it-py pytest tests -q
+    uv run --python 3.12 --with pytest --with markdown-it-py pytest tests --ignore=tests/ui -q
+
+# Run browser UI tests for review-branch. One-time setup:
+#   uv run --with pytest-playwright playwright install chromium
+test-ui:
+    uv run --python 3.12 --with pytest --with pytest-playwright --with markdown-it-py pytest tests/ui -q
+
+# Run the fast suite and the browser UI suite
+test-all: test test-ui
