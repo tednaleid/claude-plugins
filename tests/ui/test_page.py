@@ -1,6 +1,10 @@
 # ABOUTME: real-browser regression specs for the review page's JS (keyboard nav, fold,
 # ABOUTME: click-to-edit, save-status, CSS glyphs, read-only mode) - run via `just test-ui`
 
+import pytest
+
+pytest.importorskip("playwright")
+
 import review_tool
 from playwright.sync_api import expect
 
