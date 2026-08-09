@@ -24,4 +24,4 @@ def test_cmd_install_uses_env_bin(env, capsys):
     out = capsys.readouterr().out
     assert str(env / "bin" / "review-branch") in out
     assert (env / "bin" / "review-branch").exists()
-    assert "skipped" in out  # comment scripts not present yet
+    assert "glab-comment" in out and "gh-comment" in out
