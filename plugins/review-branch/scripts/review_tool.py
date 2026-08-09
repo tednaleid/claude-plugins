@@ -314,19 +314,29 @@ def finding_card(f: dict, meta: dict) -> str:
     head += [f'<span class="tag">{esc(lens)}</span>' for lens in f.get("lenses", [])]
     if f["posted"]:
         head.append(f'<a class="badge posted" href="{safe_href(f.get("posted_url", ""))}">posted</a>')
-    parts = [
-        f'<div class="finding {sev_class}" data-fid="{esc(fid)}" data-rev="{esc(f.get("comment_rev", 1))}">',
-        f'<div class="head">{" ".join(head)}</div>',
-        f'<div class="file">{file_html}</div>',
-        md_html(f.get("body", "")),
+
+    commentable = f.get("commentable", True) and not f["posted"]
+    control = [
+        '<div class="control-row">',
+        '<button class="fold-toggle" type="button" aria-expanded="true" '
+        'title="Fold (Enter: fold + next, z: in place)"></button>',
     ]
+    if commentable:
+        post_checked = " checked" if f["disposition"] == "post" else ""
+        control.append(
+            f'<label class="post-toggle" title="Toggle Post (space)"><input type="checkbox" '
+            f'class="post-chk"{post_checked}> Post to MR</label>'
+        )
+    control.append("</div>")
+
+    body_parts = [md_html(f.get("body", ""))]
     if f.get("snippet"):
-        parts.append(f"<pre><code>{esc(f['snippet'])}</code></pre>")
+        body_parts.append(f"<pre><code>{esc(f['snippet'])}</code></pre>")
     if f.get("fix"):
-        parts.append(f"<p><strong>Suggested fix:</strong> {esc(f['fix'])}</p>")
+        body_parts.append(f"<p><strong>Suggested fix:</strong> {esc(f['fix'])}</p>")
     if f["posted"]:
-        parts.append(f"<pre><code>{esc(f.get('posted_body', ''))}</code></pre>")
-    elif f.get("commentable", True):
+        body_parts.append(f"<pre><code>{esc(f.get('posted_body', ''))}</code></pre>")
+    elif commentable:
         area = ['<div class="comment-area">']
         if f["note_stale"]:
             area.append(f'<div class="applied">applied: {esc(f["note"])}</div>')
@@ -340,13 +350,19 @@ def finding_card(f: dict, meta: dict) -> str:
         area.append(
             f'<textarea class="note" placeholder="tell Claude how to adjust this">{esc(note_now)}</textarea>'
         )
-        post_checked = " checked" if f["disposition"] == "post" else ""
-        area.append(
-            f'<label class="post-toggle"><input type="checkbox" class="post-chk"{post_checked}> Post to MR</label>'
-        )
         area.append("</div>")
-        parts.append("\n".join(area))
-    parts.append("</div>")
+        body_parts.append("\n".join(area))
+
+    parts = [
+        f'<div class="finding {sev_class}" data-fid="{esc(fid)}" data-rev="{esc(f.get("comment_rev", 1))}">',
+        f'<div class="head">{" ".join(head)}</div>',
+        f'<div class="file">{file_html}</div>',
+        "\n".join(control),
+        '<div class="collapse-body">',
+        "\n".join(body_parts),
+        "</div>",
+        "</div>",
+    ]
     return "\n".join(parts)
 
 
@@ -386,6 +402,8 @@ TEMPLATE = """<!doctype html>
   .finding.med  { border-left-color: var(--amber); }
   .finding.low  { border-left-color: var(--blue); }
   .finding.info { border-left-color: var(--green); }
+  .finding.active { border-left-width: 6px; box-shadow: inset 0 0 0 1px var(--accent); }
+  .finding.collapsed .collapse-body { display: none; }
   .finding .head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 4px; flex-wrap: wrap; }
   .finding .num { color: var(--muted); font-family: var(--mono); font-size: 12px; min-width: 28px; }
   .finding .title { font-weight: 600; font-size: 14.5px; }
@@ -397,6 +415,14 @@ TEMPLATE = """<!doctype html>
   .badge.info { background: rgba(158,206,106,.15); color: var(--green); }
   .badge.posted { background: rgba(158,206,106,.15); color: var(--green); text-decoration: none; }
   .file { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+  .control-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .fold-toggle { appearance: none; -webkit-appearance: none; background: none; border: 1px solid transparent;
+                 color: var(--muted); cursor: pointer; width: 22px; height: 22px; border-radius: 4px;
+                 display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+  .fold-toggle::before { content: "\\25be"; font-size: 11px; }
+  .finding.collapsed .fold-toggle::before { content: "\\25b8"; }
+  .fold-toggle:hover { color: var(--text); border-color: var(--border); background: var(--panel2); }
+  .collapse-body { margin-top: 8px; }
   .small { color: var(--muted); font-size: 12.5px; display: block; margin-top: 10px; }
   .tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px;
          background: var(--panel2); border: 1px solid var(--border); color: var(--muted); }
@@ -424,7 +450,7 @@ TEMPLATE = """<!doctype html>
   textarea.note { min-height: 40px; font-family: inherit; }
   textarea:disabled, input:disabled { opacity: .5; }
   .applied { color: var(--muted); font-size: 12px; font-style: italic; margin-top: 8px; }
-  .post-toggle { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px;
+  .post-toggle { display: inline-flex; align-items: center; gap: 8px;
                  padding: 4px 10px 4px 4px; border: 1px solid var(--border); border-radius: 999px;
                  background: var(--panel2); color: var(--muted); font-size: 12.5px; cursor: pointer;
                  width: fit-content; }
@@ -444,6 +470,19 @@ TEMPLATE = """<!doctype html>
   .save-status.saved { color: var(--muted); }
   .save-status.saving { color: var(--accent); }
   .save-status.error { color: var(--red); }
+  .kbd-hint { margin-left: auto; cursor: pointer; color: var(--muted); font-size: 11.5px;
+              border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px;
+              background: var(--panel2); }
+  .kbd-hint:hover { color: var(--text); border-color: var(--accent); }
+  .kbd-help { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex;
+              align-items: center; justify-content: center; z-index: 50; }
+  .kbd-help[hidden] { display: none; }
+  .kbd-help-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+                     padding: 20px 24px; max-width: 420px; width: 90%; }
+  .kbd-help-panel h2 { margin: 0 0 12px; font-size: 15px; }
+  .kbd-help-panel table { margin: 0; }
+  .kbd-help-panel kbd { font-family: var(--mono); background: var(--panel2); border: 1px solid var(--border);
+                         border-radius: 4px; padding: 1px 6px; font-size: 11.5px; }
   .topnav { font-size: 12px; color: var(--muted); margin: 0 0 14px; }
   #banner { display: none; position: sticky; top: 0; background: rgba(224,175,104,.12);
             border: 1px solid var(--amber); color: var(--amber); border-radius: 6px;
@@ -460,8 +499,21 @@ TEMPLATE = """<!doctype html>
 <div class="sub"><!--SUBTITLE--></div>
 <div class="meta"><!--META--></div>
 <div class="summary-grid"><!--SUMMARY--></div>
-<div class="controls"><span class="progress" id="progress"></span><span class="save-status" id="save-status"></span></div>
+<div class="controls"><span class="progress" id="progress"></span><span class="save-status" id="save-status"></span><span class="kbd-hint" id="kbd-hint">? shortcuts</span></div>
 <!--CONTENT-->
+<div id="kbd-help" class="kbd-help" hidden>
+<div class="kbd-help-panel">
+<h2>Keyboard shortcuts</h2>
+<table>
+<tr><td><kbd>j</kbd> / <kbd>k</kbd> or <kbd>&uarr;</kbd> / <kbd>&darr;</kbd></td><td>move selection</td></tr>
+<tr><td><kbd>space</kbd></td><td>toggle Post on the active finding</td></tr>
+<tr><td><kbd>Enter</kbd></td><td>fold the active finding and move to next</td></tr>
+<tr><td><kbd>z</kbd></td><td>fold the active finding in place</td></tr>
+<tr><td><kbd>Escape</kbd></td><td>exit the comment/note editor (or close this help)</td></tr>
+<tr><td><kbd>?</kbd></td><td>toggle this help</td></tr>
+</table>
+</div>
+</div>
 </div>
 <script>window.BAKED = <!--BAKED-->;</script>
 <script>
@@ -473,21 +525,143 @@ TEMPLATE = """<!doctype html>
   var served = baked.served && location.protocol !== "file:";
   var dirty = 0;
   var saveTimer = null;
-  var needsReload = false;
-  var scrollKey = "review-branch:scroll:" + baked.route;
   var banner = document.getElementById("banner");
   var bannerMsg = document.getElementById("banner-msg");
   var bannerCopy = document.getElementById("banner-copy");
   var progress = document.getElementById("progress");
   var saveStatus = document.getElementById("save-status");
   var indexLink = document.getElementById("index-link");
+  var kbdHint = document.getElementById("kbd-hint");
+  var kbdHelp = document.getElementById("kbd-help");
   var cards = Array.prototype.slice.call(document.querySelectorAll(".finding[data-fid]"));
 
-  var savedScroll = sessionStorage.getItem(scrollKey);
-  if (savedScroll !== null) {
-    sessionStorage.removeItem(scrollKey);
-    window.scrollTo(0, parseInt(savedScroll, 10) || 0);
+  var collapseKey = "review-branch:collapsed:" + baked.route;
+  var activeKey = "review-branch:active:" + baked.route;
+
+  function loadCollapsedFids() {
+    try {
+      return JSON.parse(sessionStorage.getItem(collapseKey) || "[]");
+    } catch (e) {
+      return [];
+    }
   }
+
+  function persistCollapsedFids() {
+    var collapsed = cards.filter(function (card) { return card.classList.contains("collapsed"); })
+                          .map(function (card) { return card.dataset.fid; });
+    sessionStorage.setItem(collapseKey, JSON.stringify(collapsed));
+  }
+
+  function setFolded(card, folded) {
+    card.classList.toggle("collapsed", folded);
+    var btn = card.querySelector(".fold-toggle");
+    if (btn) btn.setAttribute("aria-expanded", folded ? "false" : "true");
+  }
+
+  function toggleFold(card) {
+    setFolded(card, !card.classList.contains("collapsed"));
+    persistCollapsedFids();
+  }
+
+  var collapsedFids = {};
+  loadCollapsedFids().forEach(function (fid) { collapsedFids[fid] = true; });
+  cards.forEach(function (card) {
+    if (collapsedFids[card.dataset.fid]) setFolded(card, true);
+    var btn = card.querySelector(".fold-toggle");
+    if (btn) {
+      btn.addEventListener("click", function () { toggleFold(card); });
+    }
+  });
+
+  // Active-card highlight and keyboard nav (works read-only too; only editing is gated on `served`).
+  var activeIndex = -1;
+
+  function setActive(index, opts) {
+    opts = opts || {};
+    if (!cards.length) return;
+    if (index < 0) index = 0;
+    if (index >= cards.length) index = cards.length - 1;
+    cards.forEach(function (card) { card.classList.remove("active"); });
+    activeIndex = index;
+    var card = cards[activeIndex];
+    card.classList.add("active");
+    sessionStorage.setItem(activeKey, card.dataset.fid);
+    if (opts.scroll !== false) card.scrollIntoView({ block: "nearest" });
+  }
+
+  if (cards.length) {
+    var initialIndex = 0;
+    var storedActiveFid = sessionStorage.getItem(activeKey);
+    if (storedActiveFid) {
+      var foundIndex = cards.findIndex(function (c) { return c.dataset.fid === storedActiveFid; });
+      if (foundIndex >= 0) initialIndex = foundIndex;
+    }
+    setActive(initialIndex, { scroll: false });
+  }
+
+  cards.forEach(function (card, i) {
+    card.addEventListener("click", function (e) {
+      if (e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT") return;
+      setActive(i, { scroll: false });
+    });
+  });
+
+  function isTyping(el) {
+    if (!el) return false;
+    var tag = el.tagName;
+    return tag === "TEXTAREA" || tag === "INPUT" || el.isContentEditable;
+  }
+
+  function closeHelp() { if (kbdHelp) kbdHelp.hidden = true; }
+  function toggleHelp() { if (kbdHelp) kbdHelp.hidden = !kbdHelp.hidden; }
+
+  if (kbdHint) kbdHint.addEventListener("click", toggleHelp);
+  if (kbdHelp) {
+    kbdHelp.addEventListener("click", function (e) {
+      if (e.target === kbdHelp) closeHelp();
+    });
+  }
+
+  document.addEventListener("keydown", function (e) {
+    var typing = isTyping(e.target);
+    if (e.key === "Escape") {
+      if (kbdHelp && !kbdHelp.hidden) { closeHelp(); return; }
+      if (typing) e.target.blur();
+      return;
+    }
+    if (typing) return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key === "?") {
+      e.preventDefault();
+      toggleHelp();
+      return;
+    }
+    if (kbdHelp && !kbdHelp.hidden) return;
+    if (e.key === "j" || e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive(activeIndex + 1);
+    } else if (e.key === "k" || e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive(activeIndex - 1);
+    } else if (e.key === " ") {
+      e.preventDefault();
+      var chkCard = cards[activeIndex];
+      var chk = chkCard && chkCard.querySelector(".post-chk");
+      if (chk && !chk.disabled) {
+        chk.checked = !chk.checked;
+        chk.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      var enterCard = cards[activeIndex];
+      if (enterCard) toggleFold(enterCard);
+      setActive(activeIndex + 1);
+    } else if (e.key === "z") {
+      e.preventDefault();
+      var zCard = cards[activeIndex];
+      if (zCard) toggleFold(zCard);
+    }
+  });
 
   function setSaveStatus(s) {
     if (s === "saving") {
@@ -567,11 +741,6 @@ TEMPLATE = """<!doctype html>
       token = resp.token;
       hideBanner();
       setSaveStatus("saved");
-      if (needsReload) {
-        needsReload = false;
-        sessionStorage.setItem(scrollKey, String(window.scrollY));
-        location.reload();
-      }
     }).catch(function () {
       setSaveStatus("error");
       showBanner("save failed (server error or unreachable) - " + dirty + " unsaved change(s) held in this tab. check daemon.log or restart with: review-branch open <review-dir>", true);
@@ -617,8 +786,25 @@ TEMPLATE = """<!doctype html>
         view.hidden = false;
         if (commentArea.value !== commentArea.defaultValue) {
           touched[fid + ":comment"] = true;
-          needsReload = true;
           schedule();
+          var raw = commentArea.value;
+          if (raw) {
+            view.textContent = raw;
+          } else {
+            view.innerHTML = '<em class="placeholder">No draft. Click to add one.</em>';
+          }
+          fetch("api/preview", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ markdown: raw })
+          }).then(function (r) {
+            if (!r.ok) throw new Error(r.status);
+            return r.json();
+          }).then(function (resp) {
+            if (raw) view.innerHTML = resp.html;
+          }).catch(function () {
+            // preview endpoint unreachable - the raw fallback set above stays in place
+          });
         }
       });
     }

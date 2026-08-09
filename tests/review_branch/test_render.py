@@ -109,6 +109,32 @@ def test_posted_finding_renders_frozen(round_dir):
     assert "comment-view" not in f3_chunk
 
 
+def test_finding_card_has_fold_toggle_and_collapse_body(round_dir):
+    page = review_tool.render_html(round_dir, served=True)
+    f1_chunk = page.split('data-fid="f1"')[1].split('data-fid="f2"')[0]
+    assert 'class="fold-toggle"' in f1_chunk
+    assert '<div class="collapse-body">' in f1_chunk
+    assert 'class="post-chk"' in f1_chunk
+    # the Post toggle lives in the control row, before the collapsible body
+    assert f1_chunk.index('class="post-chk"') < f1_chunk.index('<div class="collapse-body">')
+
+
+def test_non_commentable_and_posted_findings_still_get_fold_toggle_no_post(round_dir):
+    page = review_tool.render_html(round_dir, served=True)
+    f2_chunk = page.split('data-fid="f2"')[1].split('data-fid="f3"')[0]
+    f3_chunk = page.split('data-fid="f3"')[1].split("<h2>")[0]
+    assert 'class="fold-toggle"' in f2_chunk
+    assert 'class="fold-toggle"' in f3_chunk
+    assert "post-chk" not in f2_chunk
+    assert "post-chk" not in f3_chunk
+
+
+def test_page_has_shortcuts_affordance_and_help_overlay(round_dir):
+    page = review_tool.render_html(round_dir, served=True)
+    assert "? shortcuts" in page
+    assert 'id="kbd-help"' in page
+
+
 def test_comment_view_renders_markdown_and_textarea_carries_raw_source(env):
     d = review_tool.data_root() / "proj-abcd" / "mr-21" / "round-1"
     d.mkdir(parents=True)
