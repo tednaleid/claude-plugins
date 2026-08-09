@@ -8,9 +8,12 @@ exists on disk.
 
 ## Lifecycle
 
-- `review-branch open <round-dir>` starts the daemon if needed (detached,
-  survives the launching session), restarts it when the CLI is newer than the
-  running daemon, and prints the review URL. Idempotent.
+- `review-branch open <round-dir>` starts the server if needed (detached via
+  `review-branch serve`, survives the launching session), restarts it when
+  the CLI is newer than the running server, and prints the review URL.
+  Idempotent.
+- `review-branch serve` runs the server in the foreground, printing a
+  startup line with the clickable index URL before it blocks.
 - `review-branch stop` stops it via the pidfile in
   `${XDG_STATE_HOME:-~/.local/state}/review-branch/`. Log: `daemon.log` there.
 - The daemon stays up until stopped or reboot.
@@ -26,11 +29,19 @@ exists on disk.
 | GET | `.../api/state` | current state.json (`{"findings": {}}` if absent) |
 | GET | `.../api/version` | `{"token": <changes when toml/state/assets change>}` |
 | POST | `.../api/state` | validate `{"findings": {...}}`, stamp updated_at, write state.json, refresh review.html snapshot, git commit, return `{"ok": true, "token"}` |
+| POST | `.../api/preview` | render `{"markdown": "..."}` to `{"html": "..."}`; writes nothing, holds no lock |
 | POST | `/api/shutdown` | stop the daemon (used by the version handshake) |
 
 Unknown routes and paths outside the data root return 404 JSON. Invalid JSON
-bodies return 400. The page saves whole-document state (debounced);
-disposition is a boolean post toggle ("post" or null), off by default. The
-page polls `api/version` and reloads when clean, holds unsaved changes with a
-banner and retry when the daemon is unreachable, and is read-only when opened
-via `file://`.
+bodies, a state payload that isn't `{"findings": {...}}`, or a preview
+payload without a string `markdown` field return 400. Every POST also checks
+the Host header (must be `127.0.0.1` or `localhost`) and, when an Origin
+header is present, that it matches `http://127.0.0.1:<port>` or
+`http://localhost:<port>` for the running server's port; either check
+failing returns 403 and the request is not processed. The page saves
+whole-document state (debounced); disposition is a boolean post toggle
+("post" or null), off by default. Comment edits render in place through the
+preview endpoint (no full-page reload); the page separately polls
+`api/version` and reloads when clean and idle, holds unsaved changes with a
+banner and retry when the server is unreachable, and is read-only when
+opened via `file://`.

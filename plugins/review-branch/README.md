@@ -30,6 +30,11 @@ Claude to post, it interprets your notes, rewrites where asked, and posts the
 checked comments through the glab-comment or gh-comment skill with the From
 Claude attribution marker.
 
+The page has vim-ish keyboard nav (j/k or the arrow keys move a highlighted
+finding, space toggles its Post checkbox, Enter folds it and moves on, z
+folds it in place) and every finding can be collapsed independently; press
+`?` for the full shortcut list.
+
 ## Install
 
 ```bash

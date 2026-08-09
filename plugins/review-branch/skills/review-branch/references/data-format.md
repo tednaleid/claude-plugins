@@ -97,12 +97,8 @@ everything else; never pre-escape content.
   entries are flagged, not applied.
 - Postable body: edited_comment when edited_comment_rev equals comment_rev,
   else comment.
-- When the agent rewrites a comment from a note it bumps comment_rev; the page
-  then shows the consumed note as a dimmed "applied" annotation and resets the
-  textarea to the new draft.
-- The comment draft renders as read-only markdown by default; clicking it
-  swaps in an editable textarea, and saving on blur reloads the page (scroll
-  position preserved) so the read view reflects the freshly rendered draft.
+- When the agent rewrites a comment from a note it bumps comment_rev; the
+  formerly-current note becomes stale and is exposed as such by `status`.
 - `review-branch status <round-dir>` prints the merged view as JSON (review metadata plus merged findings).
 - `review-branch manifest <round-dir> [--exclude f3,f7]` prints posting
   entries `[{"file", "line", "body"}]` for findings with disposition "post"
