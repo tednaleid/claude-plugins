@@ -6,8 +6,14 @@ install:
     claude plugin marketplace update tednaleid
     for dir in plugins/*/; do
         name=$(basename "$dir")
-        echo "Installing $name..."
-        claude plugin install "${name}@tednaleid"
+        # `install` no-ops when already present, so update in place instead.
+        if claude plugin list 2>/dev/null | grep -q "${name}@tednaleid"; then
+            echo "Updating $name..."
+            claude plugin update "${name}@tednaleid"
+        else
+            echo "Installing $name..."
+            claude plugin install "${name}@tednaleid"
+        fi
         version=$(claude plugin list 2>&1 | grep -A1 "${name}@tednaleid" | grep "Version:" | awk '{print $2}')
         echo "  Installed ${name} v${version}"
     done
