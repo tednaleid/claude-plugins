@@ -1,7 +1,7 @@
 ---
 name: worktree
 description: Create a git worktree for reviewing an MR/PR or working on a branch in isolation. Use when the user wants to review a merge request or pull request, check out a branch in a separate worktree, or uses /worktree. Accepts an MR/PR number, an MR/PR URL, or a branch name. Runs the worktree_tool script (creates the worktree under .claude/worktrees/, copies gitignored env files, bootstraps, applies optional .worktree.toml hooks), then switches the session into it.
-allowed-tools: Bash(*worktree_tool.py *), Bash(git *), Read
+allowed-tools: Bash(*worktree_tool.py *), Bash(git *), Bash(cd *), Read
 ---
 
 # Worktree
@@ -11,20 +11,27 @@ standalone script; this skill runs it and enters the result.
 
 ## Workflow
 
-1. **Run the script** from the repo root, passing the target (MR/PR number, MR/PR URL, or
-   branch name; omit for the current branch):
+1. **Install `wt`, then create the worktree.** From the repo root, install the CLI so `wt` is
+   on the user's PATH for later hand-use, then create, passing the target (MR/PR number, MR/PR
+   URL, or branch name; omit for the current branch):
 
    ```bash
+   "${CLAUDE_PLUGIN_ROOT}/scripts/worktree_tool.py" install
    "${CLAUDE_PLUGIN_ROOT}/scripts/worktree_tool.py" create <target>
    ```
 
-   It resolves the branch, creates the worktree under `.claude/worktrees/<slug>`, copies
-   gitignored `.env*`/`.envrc` from the main worktree, bootstraps (direnv when an `.envrc`
-   was allowed in the parent, else uv/bun/pnpm/npm by lockfile), applies any
-   `.worktree.toml` hooks, and prints the worktree path on stdout with a summary on stderr.
+   `install` copies the script to `~/.local/bin/wt` (idempotent, and refreshes it to the
+   current version). `create` resolves the branch, creates the worktree under
+   `.claude/worktrees/<slug>`, copies gitignored `.env*`/`.envrc` from the main worktree,
+   bootstraps (direnv when an `.envrc` was allowed in the parent, else uv/bun/pnpm/npm by
+   lockfile), applies any `.worktree.toml` hooks, and prints the worktree path on stdout with a
+   summary on stderr. Both commands run through the bundled script, so neither depends on `wt`
+   being resolvable on PATH.
 
 2. **Enter it.** Call the `EnterWorktree` tool (not a Bash command) with `path` set to the
-   printed worktree path, so subsequent commands run inside it.
+   printed worktree path, so subsequent commands run inside it. If `EnterWorktree` is
+   unavailable or refuses (for example a pinned or subagent session whose working directory is
+   the repo root), `cd` into the printed path instead so later commands run in the worktree.
 
 3. **Report** the path and the one-line summary the script emitted.
 

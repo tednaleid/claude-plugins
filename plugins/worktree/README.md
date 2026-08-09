@@ -31,15 +31,17 @@ for review", "set up a worktree for feature/auth-fix").
 
 ## Install the `wt` CLI (to drive it by hand)
 
-From a checkout of this repo:
+Running the `/worktree` skill installs and refreshes `wt` in `~/.local/bin` automatically, so
+in most cases you get it for free. To install it without invoking the skill, from a checkout
+of this repo:
 
 ```bash
 plugins/worktree/scripts/worktree_tool.py install   # copies the script to ~/.local/bin/wt
 ```
 
-Set `WORKTREE_BIN` to install somewhere other than `~/.local/bin`. The installed `wt` is a
-snapshot copy that runs through a `uv` shebang, so its dependency-free script resolves with no
-extra setup; re-run `wt install` after a plugin bump to refresh it.
+Set `WORKTREE_BIN` to install somewhere other than `~/.local/bin`, and make sure that directory
+is on your PATH. The installed `wt` is a snapshot copy that runs through a `uv` shebang, so its
+dependency-free script resolves with no extra setup.
 
 ```
 wt [list] [filter...]      list worktrees (default), optionally filtered
