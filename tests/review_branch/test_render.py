@@ -133,6 +133,7 @@ def test_page_has_shortcuts_affordance_and_help_overlay(round_dir):
     page = review_tool.render_html(round_dir, served=True)
     assert "? shortcuts" in page
     assert 'id="kbd-help"' in page
+    assert "<kbd>n</kbd>" in page
 
 
 def test_comment_view_renders_markdown_and_textarea_carries_raw_source(env):

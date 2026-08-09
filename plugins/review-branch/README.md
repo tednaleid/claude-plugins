@@ -32,8 +32,8 @@ Claude attribution marker.
 
 The page has vim-ish keyboard nav (j/k or the arrow keys move a highlighted
 finding, space toggles its Post checkbox, Enter folds it and moves on, z
-folds it in place) and every finding can be collapsed independently; press
-`?` for the full shortcut list.
+folds it in place, n jumps to its note editor) and every finding can be
+collapsed independently; press `?` for the full shortcut list.
 
 ## Install
 

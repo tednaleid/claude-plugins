@@ -509,6 +509,7 @@ TEMPLATE = """<!doctype html>
 <tr><td><kbd>space</kbd></td><td>toggle Post on the active finding</td></tr>
 <tr><td><kbd>Enter</kbd></td><td>fold the active finding and move to next</td></tr>
 <tr><td><kbd>z</kbd></td><td>fold the active finding in place</td></tr>
+<tr><td><kbd>n</kbd></td><td>edit note on the active finding</td></tr>
 <tr><td><kbd>Escape</kbd></td><td>exit the comment/note editor (or close this help)</td></tr>
 <tr><td><kbd>?</kbd></td><td>toggle this help</td></tr>
 </table>
@@ -561,6 +562,13 @@ TEMPLATE = """<!doctype html>
   function toggleFold(card) {
     setFolded(card, !card.classList.contains("collapsed"));
     persistCollapsedFids();
+  }
+
+  function expandCard(card) {
+    if (card.classList.contains("collapsed")) {
+      setFolded(card, false);
+      persistCollapsedFids();
+    }
   }
 
   var collapsedFids = {};
@@ -626,7 +634,14 @@ TEMPLATE = """<!doctype html>
     var typing = isTyping(e.target);
     if (e.key === "Escape") {
       if (kbdHelp && !kbdHelp.hidden) { closeHelp(); return; }
-      if (typing) e.target.blur();
+      if (typing) {
+        var editorCard = e.target.closest(".finding[data-fid]");
+        e.target.blur();
+        if (editorCard) {
+          var editorIndex = cards.indexOf(editorCard);
+          if (editorIndex >= 0) setActive(editorIndex, { scroll: false });
+        }
+      }
       return;
     }
     if (typing) return;
@@ -660,6 +675,17 @@ TEMPLATE = """<!doctype html>
       e.preventDefault();
       var zCard = cards[activeIndex];
       if (zCard) toggleFold(zCard);
+    } else if (e.key === "n") {
+      e.preventDefault();
+      var noteCard = cards[activeIndex];
+      var noteArea = noteCard && noteCard.querySelector("textarea.note");
+      if (noteArea) {
+        expandCard(noteCard);
+        noteArea.scrollIntoView({ block: "nearest" });
+        noteArea.focus();
+        var noteLen = noteArea.value.length;
+        noteArea.setSelectionRange(noteLen, noteLen);
+      }
     }
   });
 
