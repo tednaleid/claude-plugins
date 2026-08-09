@@ -864,12 +864,10 @@ TEMPLATE = """<!doctype html>
 """
 
 
-def render_html(round_dir: Path, served: bool) -> str:
-    review = load_review(round_dir)
-    state = load_state(round_dir)
+def compose(review: dict, state: dict, assets_html: str, route: str, token: str, served: bool) -> str:
     meta = review.get("review", {})
     findings = merged_findings(review, state)
-    content = [assets_html(round_dir, review)]
+    content = [assets_html]
     if review.get("overall", {}).get("body"):
         content.append("<h2>Overall</h2>\n" + md_html(review["overall"]["body"]))
     content.append("<h2>Findings</h2>")
@@ -895,9 +893,7 @@ def render_html(round_dir: Path, served: bool) -> str:
             [[f"<code>{esc(r.get('path', ''))}</code>", esc(r.get("delta", "")), esc(r.get("notes", ""))] for r in review.get("files_touched", [])],
         )
     )
-    baked = json.dumps(
-        {"served": served, "route": route_for(round_dir), "token": version_token(round_dir), "state": state}
-    ).replace("</", "<\\/")
+    baked = json.dumps({"served": served, "route": route, "token": token, "state": state}).replace("</", "<\\/")
     subtitle = "Collaborative review tracker. Toggle findings to post, edit drafts, leave notes for Claude."
     return (
         TEMPLATE
@@ -908,6 +904,15 @@ def render_html(round_dir: Path, served: bool) -> str:
         .replace("<!--CONTENT-->", "\n".join(part for part in content if part))
         .replace("<!--BAKED-->", baked)
     )
+
+
+def render_html(round_dir: Path, served: bool) -> str:
+    review = load_review(round_dir)
+    state = load_state(round_dir)
+    assets = assets_html(round_dir, review)
+    route = route_for(round_dir)
+    token = version_token(round_dir)
+    return compose(review, state, assets, route, token, served)
 
 
 def cmd_render(round_dir: Path) -> Path:

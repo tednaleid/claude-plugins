@@ -272,6 +272,19 @@ comment = "Draft."
     assert "Weird severity value" in page
 
 
+def test_render_html_matches_manual_compose(round_dir):
+    # render_html is a thin shell: loading review/state/assets/route/token and
+    # handing them to compose() must produce byte-identical output.
+    page = review_tool.render_html(round_dir, served=True)
+    review = review_tool.load_review(round_dir)
+    state = review_tool.load_state(round_dir)
+    assets = review_tool.assets_html(round_dir, review)
+    route = review_tool.route_for(round_dir)
+    token = review_tool.version_token(round_dir)
+    composed = review_tool.compose(review, state, assets, route, token, served=True)
+    assert page == composed
+
+
 def test_cmd_render_writes_file_and_commits(round_dir, capsys):
     assert review_tool.main(["render", str(round_dir)]) == 0
     out_path = round_dir / "review.html"
