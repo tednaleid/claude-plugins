@@ -29,7 +29,8 @@ exists on disk.
 | POST | `/api/shutdown` | stop the daemon (used by the version handshake) |
 
 Unknown routes and paths outside the data root return 404 JSON. Invalid JSON
-bodies return 400. The page saves whole-document state (debounced), polls
-`api/version` and reloads when clean, holds unsaved changes with a banner and
-retry when the daemon is unreachable, and is read-only when opened via
-`file://`.
+bodies return 400. The page saves whole-document state (debounced);
+disposition is a boolean post toggle ("post" or null), off by default. The
+page polls `api/version` and reloads when clean, holds unsaved changes with a
+banner and retry when the daemon is unreachable, and is read-only when opened
+via `file://`.

@@ -85,9 +85,11 @@ def test_render_html_composition(round_dir):
     assert "diffs#diff-content-" in page                    # diff link
     assert "<title>seq</title>" in page                     # svg inlined
     assert "if x &lt; 1: pass" in page                      # snippet escaped
-    assert 'name="dispo-f1"' in page and "checked" in page  # disposition radio state
+    assert 'class="post-chk" checked' in page               # post toggle checked from state
     assert '"served": true' in page
     assert "API 422" in page                                # coverage table
+    assert 'id="save-status"' in page                        # always-visible save-status indicator
+    assert 'id="index-link"' in page and 'href="/"' in page  # link back to the daemon index
 
 
 def test_f2_has_no_comment_area(round_dir):
@@ -104,6 +106,54 @@ def test_posted_finding_renders_frozen(round_dir):
     assert "https://gitlab.example.com/note/42" in f3_chunk
     assert "Final posted text." in f3_chunk
     assert "textarea" not in f3_chunk
+    assert "comment-view" not in f3_chunk
+
+
+def test_comment_view_renders_markdown_and_textarea_carries_raw_source(env):
+    d = review_tool.data_root() / "proj-abcd" / "mr-21" / "round-1"
+    d.mkdir(parents=True)
+    (d / "review.toml").write_text(
+        '''
+[review]
+title = "Comment markdown"
+
+[[findings]]
+id = "f1"
+severity = "med"
+title = "Has markdown comment"
+file = "a.py"
+lines = "1"
+body = "x"
+comment = "Use `x` here"
+'''
+    )
+    page = review_tool.render_html(d, served=True)
+    assert '<div class="comment-view" tabindex="0">' in page
+    assert "<code>x</code>" in page
+    assert '<textarea class="comment" hidden>Use `x` here</textarea>' in page
+
+
+def test_post_toggle_unchecked_by_default(env):
+    d = review_tool.data_root() / "proj-abcd" / "mr-20" / "round-1"
+    d.mkdir(parents=True)
+    (d / "review.toml").write_text(
+        '''
+[review]
+title = "Toggle default"
+
+[[findings]]
+id = "f1"
+severity = "med"
+title = "No disposition yet"
+file = "a.py"
+lines = "1"
+body = "x"
+comment = "Draft."
+'''
+    )
+    page = review_tool.render_html(d, served=True)
+    assert 'class="post-chk"' in page
+    assert 'class="post-chk" checked' not in page
 
 
 def test_stale_note_renders_applied_div(round_dir):

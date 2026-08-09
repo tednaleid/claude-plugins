@@ -1,16 +1,16 @@
 ---
 name: review-branch
-description: Deep multi-lens review of an MR, PR, or any local branch. Dispatches 4 parallel subagents (architecture, security, test coverage, naming/API) inside an isolated worktree, writes structured findings to a central review store, and serves a collaborative HTML tracker from a local daemon with tri-state dispositions, editable comment drafts, and notes to Claude that round-trip so checked comments can be posted via the glab-comment or gh-comment skills when explicitly asked. Use when asked to deeply review an MR/PR, do a thorough code review of a branch, get a second opinion on changes, or uses /review-branch. Works against GitLab (glab) and GitHub (gh); auto-detects from the git remote. Also handles local-only branch reviews (no MR/PR yet) by diffing against the default branch.
+description: Deep multi-lens review of an MR, PR, or any local branch. Dispatches 4 parallel subagents (architecture, security, test coverage, naming/API) inside an isolated worktree, writes structured findings to a central review store, and serves a collaborative HTML tracker from a local daemon with a default-off Post toggle per finding, editable comment drafts, and notes to Claude that round-trip so checked comments can be posted via the glab-comment or gh-comment skills when explicitly asked. Use when asked to deeply review an MR/PR, do a thorough code review of a branch, get a second opinion on changes, or uses /review-branch. Works against GitLab (glab) and GitHub (gh); auto-detects from the git remote. Also handles local-only branch reviews (no MR/PR yet) by diffing against the default branch.
 allowed-tools: Bash(git *), Bash(glab *), Bash(gh *), Bash(jq *), Bash(mkdir *), Bash(test *), Bash(ls *), Bash(open *), Bash(review-branch *), Bash(*review_tool.py *), Read, Write, Edit, Glob, Grep, Agent, Skill
 ---
 
 # review-branch
 
 Produce a deep, multi-lens code review as structured data rendered into a
-collaborative HTML tracker. Findings live in `review.toml`; the human marks
-dispositions, edits drafts, and leaves notes in the served page; posting to
-the MR/PR happens only through the glab-comment or gh-comment skills and only
-when explicitly asked.
+collaborative HTML tracker. Findings live in `review.toml`; the human toggles
+which findings to post, edits drafts, and leaves notes in the served page;
+posting to the MR/PR happens only through the glab-comment or gh-comment
+skills and only when explicitly asked.
 
 ## Workflow
 
@@ -188,7 +188,7 @@ review-branch open "$REVIEW_DIR"
 
 1. The review URL (and the on-disk fallback `$REVIEW_DIR/review.html`).
 2. Summary line: counts per severity.
-3. How the collaboration works, in one line: mark Post/Skip, edit drafts,
+3. How the collaboration works, in one line: toggle Post to MR, edit drafts,
    leave notes; then ask to post and the comment skills take it from there.
 4. Worktree cleanup command: `git worktree remove <worktree-path>`.
 
@@ -220,8 +220,8 @@ picks the mode:
   gh-comment skills, and only when explicitly asked. Never call `glab mr
   note`, `gh pr comment`, or raw discussion/review-comment endpoints.
 - **Findings are append-only.** Never delete or renumber a finding within a
-  round; a wrong finding gets disposition Skip. A re-review after new pushes
-  is a new round: `review-branch init` again.
+  round; a wrong finding just stays off (its Post toggle left unchecked). A
+  re-review after new pushes is a new round: `review-branch init` again.
 - **review.toml is yours; state.json is not.** Never write state.json; the
   daemon owns it.
 - **No confidence threshold.** Every lens finding lands in the tracker.

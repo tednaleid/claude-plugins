@@ -21,10 +21,11 @@ Given an MR number, PR number, MR/PR URL, or branch name, the skill:
 6. Renders and serves the tracker: `review-branch open` prints a
    `http://127.0.0.1:43117/...` URL.
 
-In the tracker you mark each finding Post / Skip / Undecided, edit the
-comment drafts directly, and leave free-text notes ("soften this", "mention
-the follow-up MR"). State persists to disk through the daemon and every
-change is committed to a git repo at the review store root. When you ask
+In the tracker you toggle Post to MR on the findings you want posted (off by
+default), edit the comment drafts directly, and leave free-text notes
+("soften this", "mention the follow-up MR"). State persists to disk through
+the daemon and every change is committed to a git repo at the review store
+root. When you ask
 Claude to post, it interprets your notes, rewrites where asked, and posts the
 checked comments through the glab-comment or gh-comment skill with the From
 Claude attribution marker.

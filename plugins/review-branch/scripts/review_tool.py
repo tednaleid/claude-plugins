@@ -330,21 +330,21 @@ def finding_card(f: dict, meta: dict) -> str:
         area = ['<div class="comment-area">']
         if f["note_stale"]:
             area.append(f'<div class="applied">applied: {esc(f["note"])}</div>')
-        area.append('<label class="small">Comment draft</label>')
-        area.append(f'<textarea class="comment">{esc(f["postable_body"] or "")}</textarea>')
+        body = f["postable_body"] or ""
+        view_html = md_html(body) if body else '<em class="placeholder">No draft. Click to add one.</em>'
+        area.append('<label class="small">Comment draft (click to edit)</label>')
+        area.append(f'<div class="comment-view" tabindex="0">{view_html}</div>')
+        area.append(f'<textarea class="comment" hidden>{esc(body)}</textarea>')
         area.append('<label class="small">Note to Claude</label>')
         note_now = "" if f["note_stale"] else (f.get("note") or "")
         area.append(
             f'<textarea class="note" placeholder="tell Claude how to adjust this">{esc(note_now)}</textarea>'
         )
-        dispo = f["disposition"] or ""
-        area.append('<div class="dispo">')
-        for value, name in (("post", "Post"), ("skip", "Skip"), ("", "Undecided")):
-            checked = " checked" if dispo == value else ""
-            area.append(
-                f'<label><input type="radio" name="dispo-{esc(fid)}" value="{value}"{checked}> {name}</label>'
-            )
-        area.append("</div></div>")
+        post_checked = " checked" if f["disposition"] == "post" else ""
+        area.append(
+            f'<label class="post-toggle"><input type="checkbox" class="post-chk"{post_checked}> Post to MR</label>'
+        )
+        area.append("</div>")
         parts.append("\n".join(area))
     parts.append("</div>")
     return "\n".join(parts)
@@ -412,17 +412,39 @@ TEMPLATE = """<!doctype html>
   .num.high { color: var(--red); } .num.med { color: var(--amber); }
   .num.low { color: var(--blue); } .num.info { color: var(--green); }
   .comment-area { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 4px; }
+  .comment-view { cursor: text; margin-top: 4px; padding: 8px 10px; background: var(--panel2);
+                  color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+                  font-size: 12.5px; }
+  .comment-view:hover { border-color: var(--accent); }
+  .comment-view .placeholder { color: var(--muted); }
   textarea { width: 100%; min-height: 72px; margin-top: 4px; background: var(--panel2);
              color: var(--text); border: 1px solid var(--border); border-radius: 6px;
              padding: 8px; font: 12.5px/1.5 var(--mono); resize: vertical; }
+  textarea.comment { min-height: 140px; }
   textarea.note { min-height: 40px; font-family: inherit; }
   textarea:disabled, input:disabled { opacity: .5; }
   .applied { color: var(--muted); font-size: 12px; font-style: italic; margin-top: 8px; }
-  .dispo { display: flex; gap: 16px; margin-top: 8px; color: var(--muted); font-size: 13px; }
-  .dispo label { cursor: pointer; }
+  .post-toggle { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px;
+                 padding: 4px 10px 4px 4px; border: 1px solid var(--border); border-radius: 999px;
+                 background: var(--panel2); color: var(--muted); font-size: 12.5px; cursor: pointer;
+                 width: fit-content; }
+  .post-toggle input[type="checkbox"] { appearance: none; -webkit-appearance: none; width: 30px;
+                 height: 18px; margin: 0; border-radius: 999px; background: var(--border);
+                 position: relative; cursor: pointer; transition: background .15s; }
+  .post-toggle input[type="checkbox"]::after { content: ""; position: absolute; top: 2px; left: 2px;
+                 width: 14px; height: 14px; border-radius: 50%; background: var(--muted); transition: left .15s; }
+  .post-toggle input[type="checkbox"]:checked { background: var(--green); }
+  .post-toggle input[type="checkbox"]:checked::after { left: 14px; background: var(--panel); }
+  .post-toggle:has(input:checked) { background: rgba(158,206,106,.15); border-color: var(--green); color: var(--green); }
   .controls { display: flex; gap: 10px; align-items: center; margin: 8px 0 18px;
               font-size: 12px; color: var(--muted); }
   .progress { font-family: var(--mono); }
+  .save-status { font-family: var(--mono); font-size: 11.5px; }
+  .save-status::before { content: "\25cf"; margin-right: 5px; }
+  .save-status.saved { color: var(--muted); }
+  .save-status.saving { color: var(--accent); }
+  .save-status.error { color: var(--red); }
+  .topnav { font-size: 12px; color: var(--muted); margin: 0 0 14px; }
   #banner { display: none; position: sticky; top: 0; background: rgba(224,175,104,.12);
             border: 1px solid var(--amber); color: var(--amber); border-radius: 6px;
             padding: 8px 12px; margin: 0 0 16px; font-size: 12.5px; }
@@ -433,11 +455,12 @@ TEMPLATE = """<!doctype html>
 <body>
 <div class="wrap">
 <div id="banner"><span id="banner-msg"></span><a href="#" id="banner-copy" hidden>copy unsaved state</a></div>
+<div class="topnav"><a href="/" id="index-link">&larr; All reviews</a></div>
 <h1><!--TITLE--></h1>
 <div class="sub"><!--SUBTITLE--></div>
 <div class="meta"><!--META--></div>
 <div class="summary-grid"><!--SUMMARY--></div>
-<div class="controls"><span class="progress" id="progress"></span></div>
+<div class="controls"><span class="progress" id="progress"></span><span class="save-status" id="save-status"></span></div>
 <!--CONTENT-->
 </div>
 <script>window.BAKED = <!--BAKED-->;</script>
@@ -450,11 +473,34 @@ TEMPLATE = """<!doctype html>
   var served = baked.served && location.protocol !== "file:";
   var dirty = 0;
   var saveTimer = null;
+  var needsReload = false;
+  var scrollKey = "review-branch:scroll:" + baked.route;
   var banner = document.getElementById("banner");
   var bannerMsg = document.getElementById("banner-msg");
   var bannerCopy = document.getElementById("banner-copy");
   var progress = document.getElementById("progress");
+  var saveStatus = document.getElementById("save-status");
+  var indexLink = document.getElementById("index-link");
   var cards = Array.prototype.slice.call(document.querySelectorAll(".finding[data-fid]"));
+
+  var savedScroll = sessionStorage.getItem(scrollKey);
+  if (savedScroll !== null) {
+    sessionStorage.removeItem(scrollKey);
+    window.scrollTo(0, parseInt(savedScroll, 10) || 0);
+  }
+
+  function setSaveStatus(s) {
+    if (s === "saving") {
+      saveStatus.textContent = "Saving...";
+      saveStatus.className = "save-status saving";
+    } else if (s === "error") {
+      saveStatus.textContent = "Save failed - retrying";
+      saveStatus.className = "save-status error";
+    } else {
+      saveStatus.textContent = "All changes saved";
+      saveStatus.className = "save-status saved";
+    }
+  }
 
   function showBanner(msg, withCopy) {
     bannerMsg.textContent = msg;
@@ -464,23 +510,24 @@ TEMPLATE = """<!doctype html>
   function hideBanner() { banner.classList.remove("show"); }
 
   function updateProgress() {
-    var counts = { post: 0, skip: 0, undecided: 0 };
+    var total = 0, marked = 0;
     cards.forEach(function (card) {
-      if (!card.querySelector(".dispo")) return;
-      var checked = card.querySelector("input[type=radio]:checked");
-      counts[checked && checked.value ? checked.value : "undecided"] += 1;
+      var postChk = card.querySelector(".post-chk");
+      if (!postChk) return;
+      total += 1;
+      if (postChk.checked) marked += 1;
     });
-    progress.textContent = counts.post + " post, " + counts.skip + " skip, " + counts.undecided + " undecided";
+    progress.textContent = marked + " of " + total + " marked to post";
   }
 
   function collect() {
     cards.forEach(function (card) {
-      if (!card.querySelector(".dispo")) return;
+      var postChk = card.querySelector(".post-chk");
+      if (!postChk) return;
       var fid = card.dataset.fid;
       var crev = parseInt(card.dataset.rev, 10) || 1;
       var entry = state.findings[fid] || (state.findings[fid] = {});
-      var checked = card.querySelector("input[type=radio]:checked");
-      entry.disposition = checked && checked.value ? checked.value : null;
+      entry.disposition = postChk.checked ? "post" : null;
       var comment = card.querySelector("textarea.comment");
       if (touched[fid + ":comment"]) {
         if (comment.value !== comment.defaultValue) {
@@ -507,6 +554,7 @@ TEMPLATE = """<!doctype html>
 
   function save() {
     saveTimer = null;
+    setSaveStatus("saving");
     fetch("api/state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -518,7 +566,14 @@ TEMPLATE = """<!doctype html>
       dirty = 0;
       token = resp.token;
       hideBanner();
+      setSaveStatus("saved");
+      if (needsReload) {
+        needsReload = false;
+        sessionStorage.setItem(scrollKey, String(window.scrollY));
+        location.reload();
+      }
     }).catch(function () {
+      setSaveStatus("error");
       showBanner("save failed (server error or unreachable) - " + dirty + " unsaved change(s) held in this tab. check daemon.log or restart with: review-branch open <review-dir>", true);
       saveTimer = setTimeout(save, 5000);
     });
@@ -526,22 +581,49 @@ TEMPLATE = """<!doctype html>
 
   function schedule() {
     dirty += 1;
+    setSaveStatus("saving");
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(save, 2000);
     updateProgress();
   }
 
   updateProgress();
+  setSaveStatus("saved");
 
   if (!served) {
     document.querySelectorAll("textarea, input").forEach(function (el) { el.disabled = true; });
     showBanner("read-only snapshot - run: review-branch open <review-dir> to edit", false);
+    saveStatus.textContent = "Read-only snapshot";
+    saveStatus.className = "save-status saved";
+    if (indexLink) indexLink.hidden = true;
     return;
   }
 
   cards.forEach(function (card) {
     var fid = card.dataset.fid;
-    card.querySelectorAll("input[type=radio]").forEach(function (el) { el.addEventListener("change", schedule); });
+    card.querySelectorAll(".post-chk").forEach(function (el) { el.addEventListener("change", schedule); });
+    var view = card.querySelector(".comment-view");
+    var commentArea = card.querySelector("textarea.comment");
+    if (view && commentArea) {
+      var openEditor = function () {
+        view.hidden = true;
+        commentArea.hidden = false;
+        commentArea.focus();
+        var len = commentArea.value.length;
+        commentArea.setSelectionRange(len, len);
+      };
+      view.addEventListener("click", openEditor);
+      view.addEventListener("focus", openEditor);
+      commentArea.addEventListener("blur", function () {
+        commentArea.hidden = true;
+        view.hidden = false;
+        if (commentArea.value !== commentArea.defaultValue) {
+          touched[fid + ":comment"] = true;
+          needsReload = true;
+          schedule();
+        }
+      });
+    }
     card.querySelectorAll("textarea").forEach(function (el) {
       el.addEventListener("input", function () {
         if (el.classList.contains("comment")) touched[fid + ":comment"] = true;
@@ -606,7 +688,7 @@ def render_html(round_dir: Path, served: bool) -> str:
     baked = json.dumps(
         {"served": served, "route": route_for(round_dir), "token": version_token(round_dir), "state": state}
     ).replace("</", "<\\/")
-    subtitle = "Collaborative review tracker. Mark dispositions, edit drafts, leave notes for Claude."
+    subtitle = "Collaborative review tracker. Toggle findings to post, edit drafts, leave notes for Claude."
     return (
         TEMPLATE
         .replace("<!--TITLE-->", esc(meta.get("title", "review")))

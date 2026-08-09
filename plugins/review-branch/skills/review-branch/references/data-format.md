@@ -80,7 +80,7 @@ everything else; never pre-escape content.
       "updated_at": "2026-08-08T14:00:00Z",
       "findings": {
         "f1": {
-          "disposition": "post",          // "post" | "skip" | null
+          "disposition": "post",          // "post" | null (the toggle is off by default)
           "note": "soften this",
           "note_rev": 1,
           "edited_comment": "...",
@@ -100,6 +100,9 @@ everything else; never pre-escape content.
 - When the agent rewrites a comment from a note it bumps comment_rev; the page
   then shows the consumed note as a dimmed "applied" annotation and resets the
   textarea to the new draft.
+- The comment draft renders as read-only markdown by default; clicking it
+  swaps in an editable textarea, and saving on blur reloads the page (scroll
+  position preserved) so the read view reflects the freshly rendered draft.
 - `review-branch status <round-dir>` prints the merged view as JSON (review metadata plus merged findings).
 - `review-branch manifest <round-dir> [--exclude f3,f7]` prints posting
   entries `[{"file", "line", "body"}]` for findings with disposition "post"
