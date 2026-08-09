@@ -41,7 +41,7 @@ def split_files(diff_text):
         if raw.startswith("diff --git"):
             flush()
             path, hunk_lines, in_hunks = None, [], False
-        elif raw.startswith("+++ "):
+        elif not in_hunks and raw.startswith("+++ "):
             m = FILE_RE.match(raw)
             path = m.group(1) if m else None
         elif raw.startswith("@@"):

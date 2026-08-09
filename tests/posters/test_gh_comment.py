@@ -32,6 +32,24 @@ def test_split_files_keys_on_new_path():
     assert files["api.py"].startswith("@@ -10,3 +10,4 @@")
 
 
+def test_split_files_ignores_file_header_lookalike_in_hunk_body():
+    diff = """diff --git a/api.py b/api.py
+index 111..222 100644
+--- a/api.py
++++ b/api.py
+@@ -10,3 +10,4 @@ def handler():
+ context line
+-old line
++added one
++++ b/fake.py
++added two
+ trailing
+"""
+    files = gh.split_files(diff)
+    assert set(files) == {"api.py"}
+    assert "+++ b/fake.py" in files["api.py"]
+
+
 def test_parse_diff_lines_numbers_new_side():
     lines = gh.parse_diff_lines(gh.split_files(PR_DIFF)["api.py"])
     added = [e["new_line"] for e in lines if e["kind"] == "added"]
@@ -70,3 +88,36 @@ def test_load_items_reads_manifest(tmp_path):
     manifest.write_text(json.dumps([{"file": "api.py", "line": 11, "body": "hi"}]))
     args = type("A", (), {"manifest": str(manifest), "general": False, "target": None})()
     assert gh.load_items(args) == [{"path": "api.py", "line": 11, "body": "hi"}]
+
+
+def test_check_items_is_all_or_nothing():
+    index = {"api.py": gh.parse_diff_lines(gh.split_files(PR_DIFF)["api.py"])}
+    items = [
+        {"path": "api.py", "line": 11, "body": "clean"},
+        {"path": "missing.py", "line": 5, "body": "no such file"},
+        {"path": "api.py", "line": 999, "body": "no such line"},
+    ]
+
+    ready, problems = gh.check_items(items, index, [], allow_duplicate=False)
+
+    assert len(ready) == 1
+    assert ready[0]["path"] == "api.py" and ready[0]["line"] == 11
+    assert ready[0]["anchor"] == 11
+    assert len(problems) == 2
+    assert any("missing.py" in p and "not in this PR's diff" in p for p in problems)
+    assert any("api.py:999" in p for p in problems)
+
+
+def test_check_items_blocks_duplicate_unless_allowed():
+    index = {"api.py": gh.parse_diff_lines(gh.split_files(PR_DIFF)["api.py"])}
+    items = [{"path": "api.py", "line": 11, "body": "clean"}]
+    comments = [{"id": 42, "body": "> **From Claude:** x", "path": "api.py", "line": 11}]
+
+    ready, problems = gh.check_items(items, index, comments, allow_duplicate=False)
+    assert ready == []
+    assert len(problems) == 1
+    assert "already has a From Claude comment" in problems[0]
+
+    ready, problems = gh.check_items(items, index, comments, allow_duplicate=True)
+    assert len(ready) == 1
+    assert problems == []

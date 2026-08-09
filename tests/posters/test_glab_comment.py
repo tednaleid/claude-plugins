@@ -64,3 +64,39 @@ def test_load_items_reads_manifest(tmp_path):
     args = type("A", (), {"manifest": str(manifest), "general": False, "target": None})()
     items = gc.load_items(args)
     assert items == [{"path": "a.py", "line": 11, "body": "hi"}]
+
+
+def test_check_items_is_all_or_nothing():
+    index = {"a.py": {"lines": gc.parse_diff_lines(DIFF), "old_path": None}}
+    items = [
+        {"path": "a.py", "line": 11, "body": "clean"},
+        {"path": "missing.py", "line": 5, "body": "no such file"},
+        {"path": "a.py", "line": 999, "body": "no such line"},
+    ]
+
+    ready, problems = gc.check_items(items, index, [], allow_duplicate=False)
+
+    assert len(ready) == 1
+    assert ready[0]["path"] == "a.py" and ready[0]["line"] == 11
+    assert ready[0]["anchor"] == {"new_line": 11}
+    assert len(problems) == 2
+    assert any("missing.py" in p and "not in this MR's diff" in p for p in problems)
+    assert any("a.py:999" in p for p in problems)
+
+
+def test_check_items_blocks_duplicate_unless_allowed():
+    index = {"a.py": {"lines": gc.parse_diff_lines(DIFF), "old_path": None}}
+    items = [{"path": "a.py", "line": 11, "body": "clean"}]
+    discussions = [
+        {"id": "d1", "notes": [{"body": "> **From Claude:** x",
+                                 "position": {"new_path": "a.py", "new_line": 11}}]},
+    ]
+
+    ready, problems = gc.check_items(items, index, discussions, allow_duplicate=False)
+    assert ready == []
+    assert len(problems) == 1
+    assert "already has a From Claude comment" in problems[0]
+
+    ready, problems = gc.check_items(items, index, discussions, allow_duplicate=True)
+    assert len(ready) == 1
+    assert problems == []
