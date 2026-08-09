@@ -45,6 +45,11 @@ def test_diff_link_local_is_none():
     assert review_tool.diff_link({"vcs": "local"}, "a.py", 1) is None
 
 
+def test_diff_link_rejects_non_http_url():
+    meta = {"vcs": "glab", "url": "javascript:alert(1)//"}
+    assert review_tool.diff_link(meta, "a.py", 1) is None
+
+
 def test_version_token_changes_on_state_write(tmp_path):
     d = tmp_path / "round-1"
     d.mkdir()

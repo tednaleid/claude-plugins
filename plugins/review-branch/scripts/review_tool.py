@@ -194,7 +194,7 @@ def md_html(text: str) -> str:
 
 def diff_link(meta: dict, path: str, line: int | None) -> str | None:
     url = meta.get("url")
-    if not url:
+    if not url or safe_href(url) == "#":
         return None
     if meta.get("vcs") == "glab":
         return f"{url}/diffs#diff-content-{hashlib.sha1(path.encode()).hexdigest()}"
@@ -440,7 +440,7 @@ TEMPLATE = """<!doctype html>
               font-size: 12px; color: var(--muted); }
   .progress { font-family: var(--mono); }
   .save-status { font-family: var(--mono); font-size: 11.5px; }
-  .save-status::before { content: "\25cf"; margin-right: 5px; }
+  .save-status::before { content: "\\25cf"; margin-right: 5px; }
   .save-status.saved { color: var(--muted); }
   .save-status.saving { color: var(--accent); }
   .save-status.error { color: var(--red); }
@@ -605,15 +605,13 @@ TEMPLATE = """<!doctype html>
     var view = card.querySelector(".comment-view");
     var commentArea = card.querySelector("textarea.comment");
     if (view && commentArea) {
-      var openEditor = function () {
+      view.addEventListener("focus", function () {
         view.hidden = true;
         commentArea.hidden = false;
         commentArea.focus();
         var len = commentArea.value.length;
         commentArea.setSelectionRange(len, len);
-      };
-      view.addEventListener("click", openEditor);
-      view.addEventListener("focus", openEditor);
+      });
       commentArea.addEventListener("blur", function () {
         commentArea.hidden = true;
         view.hidden = false;

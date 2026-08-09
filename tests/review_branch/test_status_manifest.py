@@ -80,6 +80,16 @@ def test_manifest_filters_and_anchors(round_dir, capsys):
     ]
 
 
+def test_manifest_excludes_finding_with_post_toggle_off(round_dir):
+    # f1's toggle is on ("post"); f2's is off (no disposition key at all,
+    # matching what the page sends when the checkbox is unchecked).
+    (round_dir / "state.json").write_text(
+        json.dumps({"findings": {"f1": {"disposition": "post"}, "f2": {}}})
+    )
+    entries = review_tool.cmd_manifest(round_dir, exclude=set())
+    assert entries == [{"file": "a.py", "line": 20, "body": "Comment A."}]
+
+
 def test_manifest_exclude(round_dir, capsys):
     assert review_tool.main(["manifest", str(round_dir), "--exclude", "f2"]) == 0
     entries = json.loads(capsys.readouterr().out)

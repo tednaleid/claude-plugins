@@ -143,6 +143,40 @@ def test_bad_origin_403_and_does_not_write(served):
     assert after == before
 
 
+def test_matching_origin_post_succeeds(env, monkeypatch):
+    # Uses its own server (rather than the shared `served` fixture) because it
+    # needs REVIEW_BRANCH_PORT to agree with the actual bound port so that
+    # current_port() matches the Origin the client sends - the same
+    # coupling that makes production's REVIEW_BRANCH_PORT-threaded daemon
+    # (spawn_daemon -> cmd_daemon) accept its own page's same-origin POSTs.
+    d = review_tool.data_root() / "proj-abcd" / "mr-7" / "round-1"
+    d.mkdir(parents=True)
+    (d / "review.toml").write_text(REVIEW_TOML)
+    srv = review_tool.make_server(0)
+    thread = threading.Thread(target=srv.serve_forever, daemon=True)
+    thread.start()
+    try:
+        port = srv.server_address[1]
+        monkeypatch.setenv("REVIEW_BRANCH_PORT", str(port))
+        body = json.dumps({"findings": {"f1": {"disposition": "post"}}})
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        conn.request(
+            "POST",
+            "/proj-abcd/mr-7/round-1/api/state",
+            body=body,
+            headers={"Content-Type": "application/json", "Origin": f"http://127.0.0.1:{port}"},
+        )
+        resp = conn.getresponse()
+        status = resp.status
+        resp.read()
+        conn.close()
+        assert status == 200
+        saved = json.loads((d / "state.json").read_text())
+        assert saved["findings"]["f1"]["disposition"] == "post"
+    finally:
+        srv.shutdown()
+
+
 def test_concurrent_posts_all_succeed(served):
     port, d = served
 

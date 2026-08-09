@@ -179,6 +179,9 @@ def test_malicious_severity_and_url_are_neutralized(env):
         '''
 [review]
 title = "Injection attempt"
+vcs = "glab"
+number = 13
+url = "javascript:alert(1)//"
 
 [[findings]]
 id = "f1"
@@ -198,6 +201,8 @@ posted_body = "final"
     assert '<div class="finding x" onmouseover="y"' not in page
     assert 'class="badge info"' in page
     assert 'href="#">posted</a>' in page
+    assert "javascript:" not in page  # diff_link built from [review].url must not leak a javascript: href
+    assert 'href="javascript:' not in page  # meta-row MR link must not carry a javascript: href either
 
 
 def test_asset_path_escaping_round_dir_raises(env):
