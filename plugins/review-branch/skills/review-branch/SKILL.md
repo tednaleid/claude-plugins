@@ -83,7 +83,7 @@ Slug: `mr-<n>`, `pr-<n>`, or the branch name through
 `tr '/' '-' | tr -c 'a-zA-Z0-9-' '-'` with leading/trailing dashes trimmed.
 
 Create the round directory and capture its absolute path. `init` resolves the
-main repo via `git --git-common-dir`, so it works from the main repo or from
+main repo via `git rev-parse --git-common-dir`, so it works from the main repo or from
 inside a worktree:
 
 ```bash
