@@ -3,6 +3,8 @@
 
 import json
 
+import pytest
+
 import glab_comment as gc
 
 DIFF = """@@ -10,3 +10,4 @@
@@ -100,3 +102,40 @@ def test_check_items_blocks_duplicate_unless_allowed():
     ready, problems = gc.check_items(items, index, discussions, allow_duplicate=True)
     assert len(ready) == 1
     assert problems == []
+
+
+def test_diff_index_backfills_collapsed_files_from_changes(monkeypatch):
+    diffs_page = [
+        {"new_path": "small.py", "old_path": "small.py", "new_file": False,
+         "diff": "@@ -1,1 +1,2 @@\n context\n+added\n", "collapsed": False},
+        {"new_path": "big.md", "old_path": "big.md", "new_file": True,
+         "diff": "", "collapsed": True},
+    ]
+    changes = {"changes": [
+        {"new_path": "big.md", "diff": "@@ -0,0 +1,2 @@\n+line one\n+line two\n"},
+    ], "overflow": False}
+
+    def fake_api(path, **kw):
+        if "/diffs" in path:
+            return diffs_page
+        if "/changes" in path:
+            return changes
+        raise AssertionError(f"unexpected api path: {path}")
+
+    monkeypatch.setattr(gc, "glab_api", fake_api)
+    index = gc.diff_index(7)
+    assert index["small.py"]["lines"], "primary diff kept"
+    assert index["big.md"]["lines"], "collapsed file backfilled from /changes"
+
+
+def test_diff_index_fails_when_overflow_leaves_paths_unmapped(monkeypatch):
+    diffs_page = [{"new_path": "big.md", "old_path": "big.md", "new_file": True,
+                   "diff": "", "collapsed": True}]
+    changes = {"changes": [], "overflow": True}
+
+    def fake_api(path, **kw):
+        return diffs_page if "/diffs" in path else changes
+
+    monkeypatch.setattr(gc, "glab_api", fake_api)
+    with pytest.raises(SystemExit):
+        gc.diff_index(7)
