@@ -1,6 +1,8 @@
 # ABOUTME: tests for the init subcommand round-directory creation
 # ABOUTME: covers first round, round increment, and CLI stdout contract
 
+import subprocess
+
 import pytest
 
 import review_tool
@@ -35,3 +37,22 @@ def test_init_cli_prints_path(env, capsys, monkeypatch):
     assert review_tool.main(["init", "--slug", "mr-9"]) == 0
     out = capsys.readouterr().out.strip()
     assert out.endswith("mr-9/round-1")
+
+
+def test_init_from_worktree_matches_main_repo(env, tmp_path):
+    repo = tmp_path / "repo"
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    for k, v in (("user.email", "t@t"), ("user.name", "t"), ("commit.gpgsign", "false")):
+        subprocess.run(["git", "-C", str(repo), "config", k, v], check=True)
+    (repo / "f.txt").write_text("x")
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "init"], check=True)
+    wt = repo / ".claude" / "worktrees" / "feature-x"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b",
+                    "feature/x", str(wt)], check=True)
+
+    from review_tool import repo_id, cmd_init
+    assert repo_id(wt) == repo_id(repo)
+    round_from_wt = cmd_init("myslug", wt)
+    assert round_from_wt.name == "round-1"
+    assert repo_id(repo) in str(round_from_wt)

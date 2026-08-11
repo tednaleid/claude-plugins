@@ -82,8 +82,9 @@ Target branch: MR `.target_branch`; PR `--json baseRefName`; local
 Slug: `mr-<n>`, `pr-<n>`, or the branch name through
 `tr '/' '-' | tr -c 'a-zA-Z0-9-' '-'` with leading/trailing dashes trimmed.
 
-Create the round directory (run from the main repo, before entering the
-worktree) and capture its absolute path:
+Create the round directory and capture its absolute path. `init` resolves the
+main repo via `git --git-common-dir`, so it works from the main repo or from
+inside a worktree:
 
 ```bash
 REVIEW_DIR=$(review-branch init --slug <slug>)
