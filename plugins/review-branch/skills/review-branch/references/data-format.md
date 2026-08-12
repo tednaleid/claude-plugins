@@ -28,6 +28,8 @@ The data root is a git repo. Every write the tool itself performs (render, brows
     target_branch = "main"
     commits = 4
     files = "20 (+1752 / -43)"
+    head_sha = "41a8604f..."     # source HEAD the findings were produced against
+    merge_base = "f7abf751..."   # merge-base with the target branch
     spec = "docs/specs/..."   # optional
 
     [overall]

@@ -90,6 +90,15 @@ inside a worktree:
 REVIEW_DIR=$(review-branch init --slug <slug>)
 ```
 
+Record the commit provenance so a round is anchored to what it reviewed:
+
+```bash
+HEAD_SHA=$(git rev-parse HEAD)
+MERGE_BASE=$(git merge-base "origin/<target-branch>" HEAD)
+```
+
+Write these into `[review]` as `head_sha` and `merge_base` in Step 7.
+
 ## Step 4: Worktree
 
 Invoke the `worktree` skill via the `Skill` tool with the resolved source
@@ -102,13 +111,18 @@ skill's documentation only if the skill is unavailable.
 Ephemeral scratch goes in the worktree's `.llm/` (never in `$REVIEW_DIR`).
 
 ```bash
-case "$vcs" in
-  glab) glab mr diff <n> > .llm/diff.patch ;;
-  gh)   gh pr diff <n>   > .llm/diff.patch ;;
-  local) git diff origin/<target-branch>...HEAD > .llm/diff.patch ;;
-esac
-grep '^diff --git' .llm/diff.patch | awk '{print $4}' | sed 's@^b/@@' > .llm/changed-files.txt
+BASE=$(git merge-base "origin/<target-branch>" HEAD)
+git diff "$BASE"...HEAD > .llm/diff.patch
+grep '^diff --git' .llm/diff.patch | awk '{print $4}' | sed 's@^b/@@' \
+  | sort -u > .llm/changed-files.txt
 ```
+
+`glab mr diff` / `gh pr diff` emit a plain unified diff with no `diff --git`
+headers, so parsing them yields an empty file list. The worktree is pinned to
+the MR/PR head, so `git diff` produces real headers for glab, gh, and local
+alike. Assert the extraction worked: if `.llm/diff.patch` is non-empty but
+`.llm/changed-files.txt` is empty, stop and report rather than dispatching
+lenses with no file list.
 
 Prior comments (MR/PR mode only; see `references/glab.md` / `references/gh.md`):
 
@@ -144,29 +158,44 @@ look for `docs/spec*/<TICKET>*.md` and pass it to the coverage lens.
 
 Spawn all 4 lens subagents in a single message. Each prompt carries:
 worktree_path, target_branch, diff_path, changed_files, prior_comments_path
-(or `none`), hex_mode, hex_doc, spec_path, plus instructions to read
-`references/agent-contract.md` and its own `agents/lens-*.md` prompt, and to
-return a JSON array per the contract. Lenses: `review-branch:lens-architecture`,
+(or `none`), hex_mode, hex_doc, spec_path, and - as ABSOLUTE paths built from
+this skill's base directory (injected as `Base directory for this skill:` in the
+prompt header) - `contract_path: <skill_base>/references/agent-contract.md` and
+`lens_prompt_path: <skill_base>/agents/lens-<name>.md`. Do not rely on the
+subagent resolving `references/...` relatively; one lens could not find its files
+and returned wrong keys. Lenses: `review-branch:lens-architecture`,
 `review-branch:lens-security`, `review-branch:lens-coverage`,
 `review-branch:lens-naming`.
 
-If a subagent returns malformed JSON, retry once; if it still fails, log the
-lens as "no findings" and continue.
+Validate each returned object against the contract schema. If the JSON is
+malformed OR the keys do not match (e.g. `line` instead of `line_range`, a
+missing `draft_comment`, an invented field), re-prompt that lens once with the
+correct field list; if it still fails, log the lens as "no findings" and continue.
 
 ## Step 7: Aggregate into review.toml
 
-Dedupe: same file + line range within 5 lines + same topic (>= 50% word
-overlap in title) merge into one entry, keeping highest severity, the most
-specific description, concatenated distinct drafts, unioned lenses. Sort by
-severity (high, med, low, info), then file path, then line. Ids: `f1`, `f2`,
-... in final order.
+Dedupe by topic, not proximity: merge two findings only when their descriptions
+name the same defect. Two findings that share a line but describe different
+issues stay separate; nearness alone never merges. When merging, keep the
+highest severity, the most specific description, concatenated distinct drafts,
+and unioned lenses.
+
+Route by severity. `high` and `med` become `[[findings]]` (with `comment`
+drafts and `anchor`s). `low` and `info` become `[[minor]]` rows - one line each
+(`lens`, `file`, `line`, `note`), no draft, no anchor. Sort findings by severity
+(high, med), then file, then line; ids `f1`, `f2`, ... in final order.
 
 Write `$REVIEW_DIR/review.toml` incrementally per `references/data-format.md`:
 
-1. First `Write`: the `[review]` table, `[overall]`, and any `[[hex]]`,
-   `[[coverage]]`, `[[files_touched]]` rows.
+1. First `Write`: the `[review]` table (including `head_sha` and `merge_base`
+   from Step 3), `[overall]`, and any `[[hex]]`, `[[coverage]]`,
+   `[[files_touched]]`, `[[minor]]` rows.
 2. Then append the globally sorted findings in batches of about five per
    `Edit`. Never emit the whole document in one tool call.
+
+Run `review-branch status "$REVIEW_DIR"` after each five-finding batch: it
+parses the TOML and prints the merged view, so a syntax error surfaces while you
+still know which batch caused it.
 
 Every finding that warrants an MR/PR comment gets a `comment` draft (tone per
 `references/agent-contract.md`) and an `anchor` on a line the diff touches.
@@ -214,6 +243,10 @@ picks the mode:
   finding out of the batch (`--exclude`); post the clear ones and raise the
   held ones for discussion. `review-branch manifest "$REVIEW_DIR"` emits the
   batch for the comment skill.
+
+  Before building the manifest, compare the current MR/PR head to the round's
+  `head_sha`; if it has moved, warn the human that anchors may have shifted and
+  ask before posting.
 - After posting: write `posted_at`, `posted_url`, `posted_body` into
   review.toml, then run `review-branch render`; the render commit sweeps the
   posted fields into history.
@@ -228,7 +261,8 @@ picks the mode:
   re-review after new pushes is a new round: `review-branch init` again.
 - **review.toml is yours; state.json is not.** Never write state.json; the
   daemon owns it.
-- **No confidence threshold.** Every lens finding lands in the tracker.
+- **Surface by the bar, route by severity.** Lenses surface only what clears the
+  contract's bar; high/med land in `[[findings]]`, low/info in `[[minor]]`.
 - **Read full files end-to-end.** The diff is for navigation only.
 - **Reproduce when possible.** `reproduced: true` is a much stronger signal.
 - **Worktree stays.** Do not auto-remove it.
