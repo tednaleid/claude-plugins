@@ -121,3 +121,7 @@ test-ui:
 
 # Run the fast suite and the browser UI suite
 test-all: test test-ui
+
+# Type-check the plugin scripts with ty
+typecheck:
+    uvx --with markdown-it-py ty check

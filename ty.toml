@@ -1,0 +1,16 @@
+# ABOUTME: ty type-checker config for this repo's uv single-file plugin scripts
+# ABOUTME: checks the shipped scripts (not the tests) and resolves cross-imports
+
+# The plugin scripts are PEP 723 single-file programs run by `uv run`. Put the
+# script dirs on ty's search path so cross-module imports resolve as first-party.
+[environment]
+extra-paths = [
+  "plugins/worktree/scripts",
+  "plugins/review-branch/scripts",
+]
+
+# Type-check the shipped scripts only. The test suite is validated by running it
+# under pytest (the browser tests also need playwright), an environment ty has no
+# access to here, so checking the tests would only report missing test deps.
+[src]
+exclude = ["tests"]
