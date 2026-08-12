@@ -17,7 +17,7 @@ from pathlib import Path
 
 ENV_GLOBS = (".env", ".env.*", ".envrc")
 
-VERSION = "0.3.1"  # SYNC_PLUGIN_VERSION kept in step with plugin.json by scripts/sync-marketplace.ts
+VERSION = "0.3.2"  # SYNC_PLUGIN_VERSION kept in step with plugin.json by scripts/sync-marketplace.ts
 
 
 def run(cwd, *args, check=True, capture=True):

@@ -82,7 +82,7 @@
       "name": "worktree",
       "source": "./plugins/worktree",
       "description": "Create an isolated git worktree under .claude/worktrees/ for reviewing an MR/PR or working on a branch. Resolves the source branch from an MR number, URL, or branch name, copies gitignored env files (.env, .envrc) from the main worktree, bootstraps with direnv/uv/bun/npm/pnpm, and switches the session into the new worktree. Runs a standalone worktree_tool script with optional .worktree.toml hooks.",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "author": {
         "name": "Ted Naleid"
       },
