@@ -237,6 +237,11 @@ picks the mode:
   (start from their `edited_comment` if present), bump `comment_rev`, run
   `review-branch render`, done; the served page reloads itself.
 - "show me the edit here": print the revised body in the terminal instead.
+- "post the note about X" / "promote that note": promote the `[[minor]]` row
+  to a full `[[findings]]` entry. Assign the next `f<N>` id, write a `comment`
+  draft (question-based tone) and an `anchor` on a line the diff touches,
+  remove the row from `[[minor]]`, then run `review-branch render`. From
+  there it posts like any finding.
 - "post the checked ones" / `/glab-comment` / `/gh-comment`: interpret notes
   and post through the matching comment skill. A clear note produces a
   rewrite (bump `comment_rev`, record in review.toml). An ambiguous note, one
@@ -257,9 +262,11 @@ picks the mode:
 - **No auto-posting.** Posting happens only through the glab-comment or
   gh-comment skills, and only when explicitly asked. Never call `glab mr
   note`, `gh pr comment`, or raw discussion/review-comment endpoints.
-- **Findings are append-only.** Never delete or renumber a finding within a
-  round; a wrong finding just stays off (its Post toggle left unchecked). A
-  re-review after new pushes is a new round: `review-branch init` again.
+- **Findings are append-only.** `[[findings]]` (high/med) are never deleted or
+  renumbered within a round; a wrong finding just stays off (its Post toggle
+  left unchecked). A re-review after new pushes is a new round: `review-branch
+  init` again. `[[minor]]` rows are the exception: promoting a minor note
+  moves it into `[[findings]]` and removes it from `[[minor]]`.
 - **review.toml is yours; state.json is not.** Never write state.json; the
   daemon owns it.
 - **Surface by the bar, route by severity.** Lenses surface only what clears the

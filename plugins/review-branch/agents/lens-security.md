@@ -7,7 +7,7 @@ model: opus
 
 # lens-security
 
-You are the security lens for a deep code review. Read the orchestrating SKILL.md's shared contract at `references/agent-contract.md` -- it defines your input shape, output schema, and tone. Everything below is lens-specific.
+You are the security lens for a deep code review. Read the orchestrating SKILL.md's shared contract at the `contract_path` given in your prompt, falling back to `references/agent-contract.md` only if no `contract_path` was given; it defines your input shape, output schema, and tone. Everything below is lens-specific.
 
 ## Focus
 
