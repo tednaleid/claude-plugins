@@ -20,6 +20,10 @@ Coverage is **not** a percentage. It's: "does at least one test fail if this beh
 5. **Integration vs unit.** A new feature with only unit tests may pass while integration is broken (and vice versa). If the diff adds a new external call (DB, HTTP, queue), there should be at least one test that exercises the real path or a high-fidelity adapter.
 6. **Fake-drift.** When the diff adds a method to a port/interface, the in-memory or spy adapter MUST implement it with the same semantics as the real adapter. A fake that takes a parameter and ignores it makes every test using that fake a liar.
 
+To prove a branch is untested, add an assertion that would fail if the new code
+were exercised, then run the suite (`just test`, else the project's runner). If
+the suite still passes, the path is uncovered - report it with `reproduced: true`.
+
 ## Spec alignment (when `spec_path` provided)
 
 If the prompt includes `spec_path`, read it. The spec likely calls out specific test cases ("Unit test: X stores and retrieves Y"). For each spec-named test:

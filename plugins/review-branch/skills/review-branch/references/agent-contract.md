@@ -35,7 +35,10 @@ Provided in the prompt by the orchestrating SKILL.md:
 - Pre-existing issues unrelated to the diff. Out of scope.
 - Style preferences not in any CLAUDE.md, AGENTS.md, or other in-repo guidance.
 - Things a linter / type checker / formatter would catch.
-- Topics already addressed in `prior_comments_path` (read it before generating findings).
+- A topic that prior discussion in `prior_comments_path` has **resolved** (read
+  it first). A topic that is raised and still open is fair game, but add new
+  evidence - a further trigger, a wider blast radius, or a correction - rather
+  than repeating what is already on the thread.
 
 ## Output format
 
@@ -63,6 +66,8 @@ Field rules:
 
 - **`file`** -- relative path from repo root, exactly as it appears in `changed_files`.
 - **`line_range`** -- single line (`108`) or range (`108-121`). Use the source line numbers, not diff hunk offsets.
+- **`also`** -- optional list of `"path:line"` strings for the same issue at
+  other sites. Keep the primary site in `file`/`line_range`; list the rest here.
 - **`search_text`** -- a short, unique substring near the issue. Used to navigate when line numbers shift. Plain text only -- no shell metachars (`$`, `(`, `{`, backticks).
 - **`title`** -- under ~80 chars. Inline `<code>` (backticks become `<code>` in the HTML render) is allowed.
 - **`severity`** -- exactly one of: `high`, `med`, `low`, `info`.
@@ -88,13 +93,18 @@ Empty result is `[]`. Nothing else.
 - **Skip the fluff.** No "great work overall" preambles. No emojis. No em-dashes (`--` if you must). No exclamation points.
 - **For pre-existing issues you flag anyway**, say so up front: "Not introduced by this MR -- but ..."
 
-## Severity calibration
+## What to surface (the bar)
 
-When in doubt, drop one level. A noisy review trains the human reviewer to skip your findings.
+Surface a finding only when you are confident it is real AND a competent author
+would want to know. When you are unsure it matters, drop it. Do not manufacture
+nits to fill the review - a noisy review trains the author to skip your findings.
 
-- Don't tag `high` unless production behavior or security is at risk.
-- Don't tag `med` for things you'd be fine seeing in a follow-up MR.
-- `low` and `info` are fine to be generous with -- the human checks them off.
+- `high` / `med` are full findings with a draft comment.
+- `low` / `info` are surfaced as terse one-line notes (no draft, no snippet):
+  a real but minor footgun, an out-of-scope flag worth a mention. If it would
+  not survive the bar above, do not report it at all.
+- Do not tag `high` unless production behavior or security is at risk. Do not
+  tag `med` for something you would be fine seeing in a follow-up MR.
 
 ## Lens dedup hints (for the aggregator)
 
