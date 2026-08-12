@@ -1022,7 +1022,7 @@ def index_html(root: Path) -> str:
 class ReviewHandler(BaseHTTPRequestHandler):
     root: Path
 
-    def log_message(self, fmt, *args):
+    def log_message(self, format, *args):
         pass
 
     def _send(self, code: int, body: str, ctype: str = "text/html; charset=utf-8"):
