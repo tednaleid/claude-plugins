@@ -160,9 +160,9 @@ look for `docs/spec*/<TICKET>*.md` and pass it to the coverage lens.
 Spawn all 4 lens subagents in a single message. Each prompt carries:
 worktree_path, target_branch, diff_path, changed_files, prior_comments_path
 (or `none`), hex_mode, hex_doc, spec_path, and - as ABSOLUTE paths built from
-this skill's base directory (injected as `Base directory for this skill:` in the
-prompt header) - `contract_path: <skill_base>/references/agent-contract.md` and
-`lens_prompt_path: <skill_base>/agents/lens-<name>.md`. Do not rely on the
+`${CLAUDE_PLUGIN_ROOT}` (see Step 0) -
+`contract_path: ${CLAUDE_PLUGIN_ROOT}/skills/review-branch/references/agent-contract.md`
+and `lens_prompt_path: ${CLAUDE_PLUGIN_ROOT}/agents/lens-<name>.md`. Do not rely on the
 subagent resolving `references/...` relatively; one lens could not find its files
 and returned wrong keys. Lenses: `review-branch:lens-architecture`,
 `review-branch:lens-security`, `review-branch:lens-coverage`,
@@ -242,12 +242,12 @@ picks the mode:
   rewrite (bump `comment_rev`, record in review.toml). An ambiguous note, one
   contradicting the finding, or one that reads as a question holds that
   finding out of the batch (`--exclude`); post the clear ones and raise the
-  held ones for discussion. `review-branch manifest "$REVIEW_DIR"` emits the
-  batch for the comment skill.
+  held ones for discussion.
 
   Before building the manifest, compare the current MR/PR head to the round's
   `head_sha`; if it has moved, warn the human that anchors may have shifted and
-  ask before posting.
+  ask before posting. `review-branch manifest "$REVIEW_DIR"` emits the
+  batch for the comment skill.
 - After posting: write `posted_at`, `posted_url`, `posted_body` into
   review.toml, then run `review-branch render`; the render commit sweeps the
   posted fields into history.

@@ -16,6 +16,8 @@ Provided in the prompt by the orchestrating SKILL.md:
 | `prior_comments_path` | Path to a markdown file containing prior MR/PR discussion. May be absent for local-only branch reviews. |
 | `spec_path` | Optional: path to a design or spec doc the diff implements. |
 | `lens_specific_context` | Lens-specific extras (e.g., the architecture lens gets `hex_mode: true|false` and the path to `docs/hexagonal-architecture.md` if present). |
+| `contract_path` | Absolute path to this contract, provided by the orchestrator. Read it directly rather than resolving a relative path. |
+| `lens_prompt_path` | Absolute path to this lens's own prompt file, provided by the orchestrator. Read it directly. |
 
 ## How to read code
 
