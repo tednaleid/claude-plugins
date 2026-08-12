@@ -53,11 +53,13 @@ bump plugin version="":
         jq --arg v "$new" '.version = $v' "$json" > "$json.tmp" && mv "$json.tmp" "$json"
     fi
 
-    # Always sync marketplace.json so it reflects current plugin state,
+    # Always sync marketplace.json so it reflects current plugin state (and
+    # stamps the version into any scripts carrying a SYNC_PLUGIN_VERSION marker),
     # then commit anything that changed (version bump or other plugin.json edits).
     npx tsx scripts/sync-marketplace.ts
-    if ! git diff --quiet "$json" .claude-plugin/marketplace.json; then
-        git add "$json" .claude-plugin/marketplace.json
+    scripts_dir="plugins/{{plugin}}/scripts"
+    if ! git diff --quiet "$json" .claude-plugin/marketplace.json "$scripts_dir"; then
+        git add "$json" .claude-plugin/marketplace.json "$scripts_dir"
         if [ "$current" != "$new" ]; then
             git commit -m "Bump {{plugin}} to $new"
         else

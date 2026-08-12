@@ -45,16 +45,24 @@ dependency-free script resolves with no extra setup.
 
 ```
 wt [list] [filter...]      list worktrees (default), optionally filtered
-wt create [target]         create + bootstrap a worktree (see targets above)
+wt create [-q|-v] [target] create + bootstrap a worktree (see targets above)
 wt remove [--force] <t>    remove the one worktree matching <t>
 wt install                 copy this script to ~/.local/bin/wt
+wt version                 print the wt version (also `wt --version`)
 ```
 
 `list`/`remove` match by substring against branch and path; `remove` refuses when more than one
 worktree matches and never touches the main worktree. Branch deletion stays manual.
 
 Verbs prefix-match, so `wt cr foo` is `wt create foo` and `wt re foo` is `wt remove foo`. Use
-`--` to force the rest to be a list filter even when it looks like a verb: `wt -- create`.
+`--` to force the rest to be a list filter even when it looks like a verb: `wt -- create`. Every
+verb has help: `wt create --help` or `wt help create`.
+
+`create` prints its progress on stderr and the worktree path on stdout. Bootstrap
+(`uv sync`/`npm install`/...) can take a while; its live output streams when stderr is a
+terminal and is suppressed when the output is piped (so an agent driving the script does not
+collect the install log). `-v`/`--verbose` forces streaming; `-q`/`--quiet` drops to just the
+final summary line. A failed bootstrap or hook is reported rather than silently swallowed.
 
 ## Changing directory
 

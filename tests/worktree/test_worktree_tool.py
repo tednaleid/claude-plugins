@@ -1,10 +1,17 @@
 # ABOUTME: tests for worktree_tool helpers (slug, env-file filter, hook parsing,
 # ABOUTME: verb resolution, worktree parsing) plus git-backed list/remove/install
+import json
 import subprocess
+from pathlib import Path
 
 import pytest
 
 import worktree_tool as wt
+
+PLUGIN_JSON = (
+    Path(__file__).resolve().parents[2]
+    / "plugins" / "worktree" / ".claude-plugin" / "plugin.json"
+)
 
 MISSING_BINARY = "definitely-not-a-real-worktree-tool-binary"
 
@@ -69,6 +76,7 @@ def test_run_missing_executable_check_true_raises_system_exit(tmp_path):
     (["l"], ("list", [])),
     (["re", "x"], ("remove", ["x"])),          # "re" is a unique prefix of remove
     (["i"], ("install", [])),
+    (["v"], ("version", [])),
     (["feature/x"], ("list", ["feature/x"])),  # unmatched -> list filter
     (["--", "create"], ("list", ["create"])),  # -- forces literal filter
     (["-x"], ("list", ["-x"])),                # leading option -> list
@@ -150,3 +158,110 @@ def test_cmd_remove_never_matches_main_worktree(tmp_path):
     with pytest.raises(SystemExit) as exc:
         wt.cmd_remove([], root)  # only the main worktree exists
     assert "no worktree matches" in str(exc.value)
+
+
+class _FakeStderr:
+    def __init__(self, tty):
+        self._tty = tty
+
+    def isatty(self):
+        return self._tty
+
+    def write(self, *_):
+        pass
+
+    def flush(self):
+        pass
+
+
+def test_stream_level_flags_override():
+    assert wt.stream_level(["-q"]) == 0
+    assert wt.stream_level(["--quiet"]) == 0
+    assert wt.stream_level(["-v"]) == 2
+    assert wt.stream_level(["--verbose"]) == 2
+
+
+def test_stream_level_auto_detects_tty(monkeypatch):
+    monkeypatch.setattr(wt.sys, "stderr", _FakeStderr(True))
+    assert wt.stream_level([]) == 2
+    monkeypatch.setattr(wt.sys, "stderr", _FakeStderr(False))
+    assert wt.stream_level([]) == 1
+
+
+def test_phase_silent_at_quiet_level(capsys):
+    wt.phase(0, "hidden")
+    wt.phase(1, "shown")
+    err = capsys.readouterr().err
+    assert "hidden" not in err
+    assert "shown" in err
+
+
+def test_bootstrap_success_announces_and_returns_label(tmp_path, monkeypatch, capsys):
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'x'\n")
+    monkeypatch.setattr(
+        wt, "run",
+        lambda cwd, *a, **k: subprocess.CompletedProcess(list(a), 0, "", ""),
+    )
+    assert wt.bootstrap(tmp_path, tmp_path, 1) == "uv sync"
+    assert "bootstrap: uv sync" in capsys.readouterr().err
+
+
+def test_bootstrap_surfaces_failure(tmp_path, monkeypatch, capsys):
+    (tmp_path / "package-lock.json").write_text("{}")
+    monkeypatch.setattr(
+        wt, "run",
+        lambda cwd, *a, **k: subprocess.CompletedProcess(list(a), 1, "", "boom"),
+    )
+    assert wt.bootstrap(tmp_path, tmp_path, 1) == "npm install (failed)"
+    err = capsys.readouterr().err
+    assert "boom" in err
+    assert "bootstrap failed" in err
+
+
+def test_bootstrap_none_when_no_lockfile(tmp_path):
+    assert wt.bootstrap(tmp_path, tmp_path, 1) == "no bootstrap"
+
+
+def test_cmd_create_rejects_unknown_flag(tmp_path):
+    with pytest.raises(SystemExit) as exc:
+        wt.cmd_create(["--frce"], str(tmp_path))
+    assert "unknown option" in str(exc.value)
+
+
+def test_main_verb_help_does_not_create(capsys):
+    assert wt.main(["create", "--help"]) == 0
+    out = capsys.readouterr().out
+    assert "wt create" in out
+    assert "bootstrap" in out
+
+
+def test_main_help_topic(capsys):
+    assert wt.main(["help", "re"]) == 0        # prefix resolves to remove
+    assert "wt remove" in capsys.readouterr().out
+
+
+def test_main_bare_help_prints_usage(capsys):
+    assert wt.main(["--help"]) == 0
+    assert "manage git worktrees" in capsys.readouterr().out
+
+
+def test_version_matches_plugin_json():
+    declared = json.loads(PLUGIN_JSON.read_text())["version"]
+    assert wt.VERSION == declared, (
+        f"wt.VERSION {wt.VERSION} != plugin.json {declared}; run `just sync`"
+    )
+
+
+def test_cmd_version_prints_wt_version(capsys):
+    assert wt.cmd_version() == 0
+    assert capsys.readouterr().out.strip() == f"wt {wt.VERSION}"
+
+
+def test_main_version_flag(capsys):
+    assert wt.main(["--version"]) == 0
+    assert wt.VERSION in capsys.readouterr().out
+
+
+def test_main_version_verb(capsys):
+    assert wt.main(["version"]) == 0
+    assert wt.VERSION in capsys.readouterr().out

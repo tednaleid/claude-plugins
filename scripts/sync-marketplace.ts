@@ -7,6 +7,51 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, '..');
 
+// A script line tagged with this marker gets the plugin's version stamped into
+// its first quoted string, so a standalone-installed copy can report a version
+// that tracks plugin.json without reading it at runtime.
+const VERSION_MARKER = 'SYNC_PLUGIN_VERSION';
+
+function walkFiles(dir: string): string[] {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return [];
+  }
+  const files: string[] = [];
+  for (const entry of entries) {
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) files.push(...walkFiles(path));
+    else files.push(path);
+  }
+  return files;
+}
+
+function stampPluginVersion(pluginName: string, pluginPath: string, version: string) {
+  for (const file of walkFiles(join(pluginPath, 'scripts'))) {
+    let text: string;
+    try {
+      text = readFileSync(file, 'utf-8');
+    } catch {
+      continue;
+    }
+    if (!text.includes(VERSION_MARKER)) continue;
+    const updated = text
+      .split('\n')
+      .map((line) =>
+        line.includes(VERSION_MARKER)
+          ? line.replace(/(["'])[^"']*\1/, (_m, q) => `${q}${version}${q}`)
+          : line,
+      )
+      .join('\n');
+    if (updated !== text) {
+      writeFileSync(file, updated);
+      console.log(`Stamped ${pluginName} v${version} into ${file}`);
+    }
+  }
+}
+
 function discoverPlugins() {
   const pluginsDir = resolve(projectRoot, 'plugins');
   const plugins = [];
@@ -38,6 +83,7 @@ function discoverPlugins() {
         if (pluginJson.category) plugin.category = pluginJson.category;
 
         plugins.push(plugin);
+        stampPluginVersion(pluginJson.name, pluginPath, pluginJson.version);
         console.log(`Discovered plugin: ${pluginJson.name}`);
       } catch (err) {
         console.warn(`Skipping ${entry}: no valid plugin.json`);
