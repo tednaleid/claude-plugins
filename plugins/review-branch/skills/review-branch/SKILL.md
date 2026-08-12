@@ -90,15 +90,6 @@ inside a worktree:
 REVIEW_DIR=$(review-branch init --slug <slug>)
 ```
 
-Record the commit provenance so a round is anchored to what it reviewed:
-
-```bash
-HEAD_SHA=$(git rev-parse HEAD)
-MERGE_BASE=$(git merge-base "origin/<target-branch>" HEAD)
-```
-
-Write these into `[review]` as `head_sha` and `merge_base` in Step 7.
-
 ## Step 4: Worktree
 
 Invoke the `worktree` skill via the `Skill` tool with the resolved source
@@ -123,6 +114,16 @@ the MR/PR head, so `git diff` produces real headers for glab, gh, and local
 alike. Assert the extraction worked: if `.llm/diff.patch` is non-empty but
 `.llm/changed-files.txt` is empty, stop and report rather than dispatching
 lenses with no file list.
+
+Record the commit provenance so the round is anchored to what it reviewed,
+reusing `BASE` from above rather than recomputing the merge-base:
+
+```bash
+HEAD_SHA=$(git rev-parse HEAD)
+MERGE_BASE=$BASE
+```
+
+Write these into `[review]` as `head_sha` and `merge_base` in Step 7.
 
 Prior comments (MR/PR mode only; see `references/glab.md` / `references/gh.md`):
 
@@ -188,7 +189,7 @@ drafts and `anchor`s). `low` and `info` become `[[minor]]` rows - one line each
 Write `$REVIEW_DIR/review.toml` incrementally per `references/data-format.md`:
 
 1. First `Write`: the `[review]` table (including `head_sha` and `merge_base`
-   from Step 3), `[overall]`, and any `[[hex]]`, `[[coverage]]`,
+   from Step 5), `[overall]`, and any `[[hex]]`, `[[coverage]]`,
    `[[files_touched]]`, `[[minor]]` rows.
 2. Then append the globally sorted findings in batches of about five per
    `Edit`. Never emit the whole document in one tool call.
