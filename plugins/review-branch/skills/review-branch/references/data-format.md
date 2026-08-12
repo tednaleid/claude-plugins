@@ -44,6 +44,7 @@ The data root is a git repo. Every write the tool itself performs (render, brows
     title = "..."
     file = "runner/api.py"
     lines = "108-121"         # optional
+    also = ["memory.py:79", "omni_projects.py:201"]  # optional extra sites of the same issue
     lenses = ["security"]     # optional
     body = """Markdown explanation."""
     snippet = '''raw code, renderer escapes'''   # optional
@@ -70,6 +71,12 @@ The data root is a git repo. Every write the tool itself performs (render, brows
     path = "runner/api.py"
     delta = "+18"
     notes = "see f1, f2"
+
+    [[minor]]                 # optional; low/info observations, terse and unpostable
+    lens = "naming"           # the single lens that raised it
+    file = "runner/api.py"
+    line = "88"               # optional; single line or range
+    note = "..."              # one-sentence markdown; the nit itself
 
 Prose fields are markdown (commonmark plus tables). The renderer escapes
 everything else; never pre-escape content.

@@ -191,12 +191,13 @@ def test_stale_note_renders_applied_div(round_dir):
     assert 'class="note" placeholder="tell Claude how to adjust this"></textarea>' in f1_chunk
 
 
-def test_summary_shows_med_zero_hides_low_zero(round_dir):
+def test_summary_shows_high_med_and_minor_notes_cards(round_dir):
     page = review_tool.render_html(round_dir, served=True)
     assert '<div class="num high">2</div>' in page
     assert '<div class="num med">0</div>' in page
-    assert 'num low' not in page
-    assert '<div class="num info">1</div>' in page
+    assert "Minor notes" in page
+    assert "Low / nits" not in page
+    assert "Out-of-scope flags" not in page
 
 
 def test_malicious_severity_and_url_are_neutralized(env):

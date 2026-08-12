@@ -106,3 +106,42 @@ def test_compose_never_touches_filesystem_or_data_root(monkeypatch):
     monkeypatch.setattr(review_tool, "assets_html", boom)
     review = {"review": {"title": "t"}, "findings": []}
     review_tool.compose(review, {"findings": {}}, "", "route", "tok", True)
+
+
+def test_minor_notes_render_in_collapsed_section_without_post_toggle():
+    review = {
+        "review": {"title": "t"},
+        "findings": [],
+        "minor": [
+            {"lens": "naming", "file": "a.py", "line": "12", "note": "shadowed `x`"},
+        ],
+    }
+    page = review_tool.compose(review, {"findings": {}}, "", "route", "tok", True)
+    assert "<details" in page and "Minor notes (1)" in page
+    assert "a.py:12" in page and "shadowed" in page
+    # the minor block itself carries no finding controls
+    start = page.index('<details class="minor"')
+    block = page[start:page.index("</details>", start)]
+    assert "data-fid" not in block and "post-chk" not in block
+
+
+def test_summary_counts_minor_separately_from_findings():
+    review = {
+        "review": {"title": "t"},
+        "findings": [{"id": "f1", "severity": "high", "title": "boom", "file": "a.py"}],
+        "minor": [{"lens": "naming", "file": "a.py", "note": "n1"},
+                  {"lens": "coverage", "file": "b.py", "note": "n2"}],
+    }
+    page = review_tool.compose(review, {"findings": {}}, "", "route", "tok", True)
+    assert '<div class="num low">2</div>' in page  # the Minor notes card shows 2
+
+
+def test_finding_also_list_renders_extra_sites():
+    review = {
+        "review": {"title": "t"},
+        "findings": [{"id": "f1", "severity": "high", "title": "log interp",
+                      "file": "postgres.py", "lines": "110",
+                      "also": ["memory.py:79", "omni_projects.py:201"]}],
+    }
+    page = review_tool.compose(review, {"findings": {}}, "", "route", "tok", True)
+    assert "memory.py:79" in page and "omni_projects.py:201" in page

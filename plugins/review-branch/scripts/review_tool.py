@@ -248,18 +248,43 @@ def meta_row(meta: dict) -> str:
     return "\n".join(spans)
 
 
-def summary_cards(findings: list[dict]) -> str:
+def summary_cards(findings: list[dict], minor_count: int = 0) -> str:
     counts: dict[str, int] = {}
     for f in findings:
         sev = f.get("severity", "info")
         counts[sev] = counts.get(sev, 0) + 1
     cards = []
-    for sev, name in (("high", "High"), ("med", "Medium"), ("low", "Low / nits"), ("info", "Out-of-scope flags")):
-        if counts.get(sev, 0) or sev in ("high", "med"):
-            cards.append(
-                f'<div class="card"><div class="num {sev}">{counts.get(sev, 0)}</div><div class="label">{name}</div></div>'
-            )
+    for sev, name in (("high", "High"), ("med", "Medium")):
+        cards.append(
+            f'<div class="card"><div class="num {sev}">{counts.get(sev, 0)}</div>'
+            f'<div class="label">{name}</div></div>'
+        )
+    cards.append(
+        f'<div class="card"><div class="num low">{minor_count}</div>'
+        f'<div class="label">Minor notes</div></div>'
+    )
     return "\n".join(cards)
+
+
+def minor_html(minor: list[dict]) -> str:
+    if not minor:
+        return ""
+    rows = []
+    for m in minor:
+        loc = f'{m.get("file", "")}:{m["line"]}' if m.get("line") else m.get("file", "")
+        rows.append(
+            "<tr>"
+            f'<td>{esc(m.get("lens", ""))}</td>'
+            f"<td><code>{esc(loc)}</code></td>"
+            f"<td>{md_html(m.get('note', ''))}</td>"
+            "</tr>"
+        )
+    head = "<tr><th>Lens</th><th>Location</th><th>Note</th></tr>"
+    body = "\n".join(rows)
+    return (
+        f'<details class="minor"><summary>Minor notes ({len(minor)})</summary>\n'
+        f"<table>\n{head}\n{body}\n</table>\n</details>"
+    )
 
 
 def assets_html(round_dir: Path, review: dict) -> str:
@@ -306,6 +331,12 @@ def finding_card(f: dict, meta: dict) -> str:
     fileref = f'{f["file"]}:{f["lines"]}' if f.get("lines") else f["file"]
     link = diff_link(meta, f["file"], line)
     file_html = f'<a href="{esc(link)}">{esc(fileref)}</a>' if link else esc(fileref)
+    also = f.get("also") or []
+    also_html = (
+        f'<div class="also">also: '
+        + ", ".join(f"<code>{esc(a)}</code>" for a in also)
+        + "</div>"
+    ) if also else ""
     head = [
         f'<span class="num">{esc(fid)}</span>',
         f'<span class="title">{esc(f.get("title", ""))}</span>',
@@ -357,13 +388,14 @@ def finding_card(f: dict, meta: dict) -> str:
         f'<div class="finding {sev_class}" data-fid="{esc(fid)}" data-rev="{esc(f.get("comment_rev", 1))}">',
         f'<div class="head">{" ".join(head)}</div>',
         f'<div class="file">{file_html}</div>',
+        also_html,
         "\n".join(control),
         '<div class="collapse-body">',
         "\n".join(body_parts),
         "</div>",
         "</div>",
     ]
-    return "\n".join(parts)
+    return "\n".join(p for p in parts if p)
 
 
 TEMPLATE = """<!doctype html>
@@ -867,6 +899,7 @@ TEMPLATE = """<!doctype html>
 def compose(review: dict, state: dict, assets_html: str, route: str, token: str, served: bool) -> str:
     meta = review.get("review", {})
     findings = merged_findings(review, state)
+    minor = review.get("minor", [])
     content = [assets_html]
     if review.get("overall", {}).get("body"):
         content.append("<h2>Overall</h2>\n" + md_html(review["overall"]["body"]))
@@ -893,6 +926,7 @@ def compose(review: dict, state: dict, assets_html: str, route: str, token: str,
             [[f"<code>{esc(r.get('path', ''))}</code>", esc(r.get("delta", "")), esc(r.get("notes", ""))] for r in review.get("files_touched", [])],
         )
     )
+    content.append(minor_html(minor))
     baked = json.dumps({"served": served, "route": route, "token": token, "state": state}).replace("</", "<\\/")
     subtitle = "Collaborative review tracker. Toggle findings to post, edit drafts, leave notes for Claude."
     return (
@@ -900,7 +934,7 @@ def compose(review: dict, state: dict, assets_html: str, route: str, token: str,
         .replace("<!--TITLE-->", esc(meta.get("title", "review")))
         .replace("<!--SUBTITLE-->", subtitle)
         .replace("<!--META-->", meta_row(meta))
-        .replace("<!--SUMMARY-->", summary_cards(findings))
+        .replace("<!--SUMMARY-->", summary_cards(findings, len(minor)))
         .replace("<!--CONTENT-->", "\n".join(part for part in content if part))
         .replace("<!--BAKED-->", baked)
     )
