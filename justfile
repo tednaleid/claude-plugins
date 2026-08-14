@@ -57,9 +57,11 @@ bump plugin version="":
     # stamps the version into any scripts carrying a SYNC_PLUGIN_VERSION marker),
     # then commit anything that changed (version bump or other plugin.json edits).
     npx tsx scripts/sync-marketplace.ts
+    paths=("$json" .claude-plugin/marketplace.json)
     scripts_dir="plugins/{{plugin}}/scripts"
-    if ! git diff --quiet "$json" .claude-plugin/marketplace.json "$scripts_dir"; then
-        git add "$json" .claude-plugin/marketplace.json "$scripts_dir"
+    if [ -d "$scripts_dir" ]; then paths+=("$scripts_dir"); fi
+    if ! git diff --quiet "${paths[@]}"; then
+        git add "${paths[@]}"
         if [ "$current" != "$new" ]; then
             git commit -m "Bump {{plugin}} to $new"
         else
