@@ -1,7 +1,7 @@
 ---
 name: just-bootstrap
 description: Audit and set up CI, release, Justfile, and Homebrew infrastructure for any repo. Detects language (Rust, Zig, Swift, TypeScript/Bun) and project type (CLI, macOS app) automatically. Use this whenever the user mentions CI setup, release automation, homebrew tap, justfile recipes, bump/retag commands, pre-commit hooks, or wants to normalize build infrastructure across projects. Also use when the user asks about GitHub Actions workflows for building, testing, or releasing their project.
-allowed-tools: Bash(gh release list *)
+allowed-tools: Bash(gh release list *), Bash(gh api /repos/*/subscription)
 ---
 
 # just-bootstrap
@@ -95,6 +95,15 @@ test/lint jobs that duplicate what CI already runs?
 tap update step in the release workflow? For CLIs, this means a formula. For
 macOS apps, a cask.
 
+**Repo watch subscription**: Is the owner subscribed to their own repo? Check
+with `gh api /repos/<owner>/<repo>/subscription`. A 404 means no subscription
+record exists, so issues and pull requests opened by other people generate no
+notification and therefore no email. Owning a repo does not subscribe you to
+it: GitHub sunset automatic watching of repositories and teams on 2025-05-23,
+so every repo created after that date starts unwatched. Classify as **missing**
+on a 404, **present** when `.subscribed` is true. If `.ignored` is true, leave
+it alone and classify as present, since that is a deliberate opt-out.
+
 **Bump recipe**: Does a bump recipe exist in the justfile? Does it create
 annotated tags (not lightweight)? Does it generate release notes via
 `claude -p` (with fallback)?
@@ -175,6 +184,17 @@ existing file.
 When modifying an existing release workflow, add the homebrew update steps
 rather than rewriting the whole file. Preserve existing build matrix and
 packaging steps if they work.
+
+**Repo watch**: If the audit found no subscription record, subscribe the owner:
+
+```
+gh api --method PUT /repos/<owner>/<repo>/subscription \
+  -F subscribed=true -F ignored=false
+```
+
+Verify with `gh api /repos/<owner>/<repo> --jq .subscribers_count`, which should
+be at least 1. Never run this against a repo whose existing subscription has
+`ignored: true`.
 
 ### GitHub Actions Versions
 
