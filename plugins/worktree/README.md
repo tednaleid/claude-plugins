@@ -20,6 +20,17 @@ Create then:
    `bun install` / `pnpm install` / `npm install` by lock file.
 4. Applies any `.worktree.toml` hooks, prints the path on stdout and a summary on stderr.
 
+`create` is idempotent. Against a worktree that already exists it reuses it and exits 0, so
+stdout is always the path to the worktree for that target. The checkout is left untouched, but
+steps 2-4 all run again, which finishes a setup that was interrupted partway. These worktrees
+are disposable, so copies overwrite: an `.env` edited inside the worktree loses to the main
+worktree's copy, and `[[command]]` hooks run every time. To land in an existing worktree
+without re-running setup, `cd` to it instead.
+
+A worktree directory deleted outright is recreated (`create` prunes the stale registration that
+otherwise makes `git worktree add` refuse the path). A directory that exists but holds no
+checkout, such as one left behind by `rm -rf`, is an error rather than a silent reuse.
+
 ## Install the plugin (for the `/worktree` skill)
 
 ```bash
@@ -78,6 +89,21 @@ wcd () {
 ```
 
 It reads `git worktree list`, so it works for any worktree regardless of how it was made.
+
+To create-or-jump in one step, lean on `create` being idempotent and printing the path on
+stdout. Run it from the main worktree, since `wt` resolves `.claude/worktrees/` against the
+current checkout's root and would otherwise nest one worktree inside another:
+
+```zsh
+wtcd () {
+  local main path
+  main=$(git worktree list --porcelain | head -1 | cut -d' ' -f2-)
+  path=$(cd "$main" && wt create "$@") || return
+  cd "$path"
+}
+```
+
+Only stdout is captured, so stderr stays on the terminal and bootstrap output streams live.
 
 ## Per-repo hooks
 

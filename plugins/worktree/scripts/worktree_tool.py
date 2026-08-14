@@ -118,8 +118,25 @@ def gitignored_files(repo_root):
     return [line for line in out.stdout.splitlines() if line]
 
 
+def is_worktree_root(path):
+    """True when path is the root of a live worktree checkout.
+
+    Guards reuse: a directory left behind by `rm -rf` on a worktree still shows
+    up in `git worktree list`, but has no checkout in it. Asking git for the
+    toplevel from inside the directory answers the question that matters, since
+    a gutted or plain directory resolves to an enclosing repo instead.
+    """
+    out = run(path, "git", "rev-parse", "--show-toplevel", check=False)
+    if out.returncode != 0:
+        return False
+    return Path(out.stdout.strip()).resolve() == Path(path).resolve()
+
+
 def create_worktree(repo_root, branch, dest):
     run(repo_root, "git", "fetch", "origin", check=False)
+    # Clears registrations for worktrees whose directories are gone, which
+    # otherwise make `worktree add` refuse the path forever.
+    run(repo_root, "git", "worktree", "prune", check=False)
     dest.parent.mkdir(parents=True, exist_ok=True)
     origin_ref = f"origin/{branch}"
     exists = run(repo_root, "git", "rev-parse", "--verify", origin_ref,
@@ -234,11 +251,14 @@ def cmd_create(args, repo_root):
     vcs = detect_vcs(repo_root)
     branch = resolve_branch(target, vcs, repo_root)
     dest = Path(repo_root) / ".claude" / "worktrees" / slug_dir(branch)
-    if dest.exists():
-        raise SystemExit(f"worktree already exists: {dest}")
-
-    phase(level, f"worktree add {branch}")
-    create_worktree(repo_root, branch, dest)
+    reused = dest.exists()
+    if reused:
+        if not is_worktree_root(dest):
+            raise SystemExit(f"path exists but is not a git worktree: {dest}")
+        phase(level, f"reuse worktree {branch}")
+    else:
+        phase(level, f"worktree add {branch}")
+        create_worktree(repo_root, branch, dest)
     copied = copy_env_files(repo_root, dest)
     if copied:
         phase(level, "copy env: " + ", ".join(copied))
@@ -246,7 +266,8 @@ def cmd_create(args, repo_root):
     applied = apply_hooks(repo_root, dest, load_hooks(repo_root), level)
 
     print(str(dest))
-    summary = [f"branch {branch}", f"bootstrap: {step}"]
+    summary = [f"branch {branch}" + (" (reused)" if reused else ""),
+               f"bootstrap: {step}"]
     if copied:
         summary.append("copied: " + ", ".join(copied))
     if applied:
@@ -392,6 +413,14 @@ HEAD), copies gitignored .env*/.envrc from the main worktree, bootstraps
 (direnv when the parent .envrc was allowed, else uv/bun/pnpm/npm by lockfile),
 and applies any .worktree.toml hooks. Prints the path on stdout and progress on
 stderr; bootstrap output streams live at a terminal and stays quiet when piped.
+
+Re-running against a worktree that already exists reuses it and exits 0, so the
+path on stdout is always the worktree for <target>. The checkout is left alone;
+env copy, bootstrap, and hooks all run again so an interrupted setup finishes.
+Worktrees here are disposable, so copies overwrite. To land in an existing
+worktree without re-running setup, cd to it instead. A worktree directory that
+was deleted outright is recreated; one that exists but holds no checkout is an
+error rather than a silent reuse.
 """,
     "list": """\
 wt [list] [filter...]        list worktrees (the default command)

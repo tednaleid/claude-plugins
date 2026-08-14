@@ -28,6 +28,10 @@ standalone script; this skill runs it and enters the result.
    summary on stderr. Both commands run through the bundled script, so neither depends on `wt`
    being resolvable on PATH.
 
+   `create` is idempotent: if the worktree already exists it is reused and the setup steps run
+   again, so stdout is the worktree path either way. Do not pre-check for an existing worktree
+   or fall back to `git worktree add`.
+
 2. **Enter it.** Call the `EnterWorktree` tool (not a Bash command) with `path` set to the
    printed worktree path, so subsequent commands run inside it. If `EnterWorktree` is
    unavailable or refuses (for example a pinned or subagent session whose working directory is

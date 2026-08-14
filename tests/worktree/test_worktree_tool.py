@@ -1,6 +1,7 @@
 # ABOUTME: tests for worktree_tool helpers (slug, env-file filter, hook parsing,
 # ABOUTME: verb resolution, worktree parsing) plus git-backed list/remove/install
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -226,6 +227,89 @@ def test_cmd_create_rejects_unknown_flag(tmp_path):
     with pytest.raises(SystemExit) as exc:
         wt.cmd_create(["--frce"], str(tmp_path))
     assert "unknown option" in str(exc.value)
+
+
+def worktree_dest(root, branch):
+    return wt.Path(root) / ".claude" / "worktrees" / wt.slug_dir(branch)
+
+
+def test_cmd_create_reuses_an_existing_worktree(tmp_path, capsys):
+    root = git_repo(tmp_path / "repo")
+    dest = worktree_dest(root, "feature/x")
+    wt.create_worktree(root, "feature/x", dest)
+
+    assert wt.cmd_create(["feature/x"], root) == 0
+    captured = capsys.readouterr()
+    assert captured.out.strip() == str(dest)
+    assert "reused" in captured.err
+
+
+def test_cmd_create_rejects_a_path_that_is_not_a_worktree(tmp_path):
+    root = git_repo(tmp_path / "repo")
+    worktree_dest(root, "feature/x").mkdir(parents=True)
+
+    with pytest.raises(SystemExit) as exc:
+        wt.cmd_create(["feature/x"], root)
+    assert "not a git worktree" in str(exc.value)
+
+
+def test_cmd_create_rejects_a_gutted_worktree_directory(tmp_path):
+    """A `rm -rf`'d worktree leaves git's registration behind; the path is not usable."""
+    root = git_repo(tmp_path / "repo")
+    dest = worktree_dest(root, "feature/x")
+    wt.create_worktree(root, "feature/x", dest)
+    shutil.rmtree(dest)
+    dest.mkdir()
+
+    with pytest.raises(SystemExit) as exc:
+        wt.cmd_create(["feature/x"], root)
+    assert "not a git worktree" in str(exc.value)
+
+
+def test_cmd_create_recreates_after_the_worktree_directory_is_deleted(tmp_path):
+    root = git_repo(tmp_path / "repo")
+    dest = worktree_dest(root, "feature/x")
+    wt.create_worktree(root, "feature/x", dest)
+    shutil.rmtree(dest)
+
+    assert wt.cmd_create(["feature/x"], root) == 0
+    assert (dest / "f.txt").exists()
+
+
+def test_cmd_create_reuse_recopies_env_files_over_local_edits(tmp_path):
+    root = git_repo(tmp_path / "repo")
+    (wt.Path(root) / ".gitignore").write_text(".env\n")
+    (wt.Path(root) / ".env").write_text("MAIN=1\n")
+    dest = worktree_dest(root, "feature/x")
+    wt.create_worktree(root, "feature/x", dest)
+    (dest / ".env").write_text("LOCAL=1\n")
+
+    assert wt.cmd_create(["feature/x"], root) == 0
+    assert (dest / ".env").read_text() == "MAIN=1\n"
+
+
+def test_cmd_create_reuse_reruns_command_hooks(tmp_path):
+    root = git_repo(tmp_path / "repo")
+    (wt.Path(root) / ".worktree.toml").write_text(
+        '[[command]]\nrun = "echo ran >> marker.txt"\n'
+    )
+    dest = worktree_dest(root, "feature/x")
+
+    assert wt.cmd_create(["feature/x"], root) == 0
+    assert wt.cmd_create(["feature/x"], root) == 0
+    assert (dest / "marker.txt").read_text().count("ran") == 2
+
+
+def test_cmd_create_reuse_reruns_bootstrap(tmp_path, monkeypatch):
+    root = git_repo(tmp_path / "repo")
+    dest = worktree_dest(root, "feature/x")
+    wt.create_worktree(root, "feature/x", dest)
+    calls = []
+    monkeypatch.setattr(wt, "bootstrap",
+                        lambda repo_root, d, level: calls.append(d) or "uv sync")
+
+    assert wt.cmd_create(["feature/x"], root) == 0
+    assert calls == [dest]
 
 
 def test_main_verb_help_does_not_create(capsys):
