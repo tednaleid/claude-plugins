@@ -74,6 +74,8 @@ verb has help: `wt create --help` or `wt help create`.
 terminal and is suppressed when the output is piped (so an agent driving the script does not
 collect the install log). `-v`/`--verbose` forces streaming; `-q`/`--quiet` drops to just the
 final summary line. A failed bootstrap or hook is reported rather than silently swallowed.
+Streamed output goes to stderr even though the child writes it to stdout, so stdout is the
+worktree path and nothing else and `wt_path=$(wt create ...)` is safe from a terminal.
 
 ## Changing directory
 

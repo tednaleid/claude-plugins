@@ -21,9 +21,13 @@ VERSION = "0.3.3"  # SYNC_PLUGIN_VERSION kept in step with plugin.json by script
 
 
 def run(cwd, *args, check=True, capture=True):
+    # Streaming sends the child's stdout to stderr and inherits its stderr, so
+    # progress stays live while our stdout carries the worktree path alone.
+    child_out = subprocess.PIPE if capture else sys.stderr
+    child_err = subprocess.PIPE if capture else None
     try:
-        out = subprocess.run(list(args), cwd=str(cwd), text=True,
-                             capture_output=capture, check=False)
+        out = subprocess.run(list(args), cwd=str(cwd), text=True, check=False,
+                             stdout=child_out, stderr=child_err)
     except FileNotFoundError:
         if check:
             raise SystemExit(f"{args[0]} not found")

@@ -70,6 +70,14 @@ def test_run_missing_executable_check_true_raises_system_exit(tmp_path):
         wt.run(tmp_path, MISSING_BINARY)
 
 
+def test_run_streaming_sends_child_stdout_to_stderr(tmp_path, capfd):
+    """stdout belongs to the worktree path alone, so a streamed child must not write there."""
+    wt.run(tmp_path, "sh", "-c", "echo child-noise", capture=False)
+    captured = capfd.readouterr()
+    assert "child-noise" not in captured.out
+    assert "child-noise" in captured.err
+
+
 @pytest.mark.parametrize("argv, expected", [
     ([], ("list", [])),
     (["cr", "foo"], ("create", ["foo"])),
@@ -310,6 +318,20 @@ def test_cmd_create_reuse_reruns_bootstrap(tmp_path, monkeypatch):
 
     assert wt.cmd_create(["feature/x"], root) == 0
     assert calls == [dest]
+
+
+def test_cmd_create_streaming_prints_only_the_path_on_stdout(tmp_path, capfd):
+    """`wt_path=$(wt create ...)` at a terminal: level 2 streams, stdout stays one line."""
+    root = git_repo(tmp_path / "repo")
+    (wt.Path(root) / ".worktree.toml").write_text(
+        '[[command]]\nrun = "echo hook-noise"\n'
+    )
+    dest = worktree_dest(root, "feature/x")
+
+    assert wt.cmd_create(["-v", "feature/x"], root) == 0
+    captured = capfd.readouterr()
+    assert captured.out.splitlines() == [str(dest)]
+    assert "hook-noise" in captured.err
 
 
 def test_main_verb_help_does_not_create(capsys):
