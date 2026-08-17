@@ -66,8 +66,11 @@ def test_serve_is_registered_subcommand_not_daemon(capsys):
         review_tool.main(["bogus"])
     assert exc.value.code == 2
     err = capsys.readouterr().err
-    assert "'serve'" in err
-    assert "'daemon'" not in err
+    # The choices braces in the usage line, not the "invalid choice" sentence,
+    # which quotes each choice differently across Python versions.
+    choices = err.split("{", 1)[1].split("}", 1)[0].split(",")
+    assert "serve" in choices
+    assert "daemon" not in choices
 
 
 def test_spawn_daemon_invokes_serve(env, monkeypatch):
