@@ -20,6 +20,13 @@ Create then:
    `bun install` / `pnpm install` / `npm install` by lock file.
 4. Applies any `.worktree.toml` hooks, prints the path on stdout and a summary on stderr.
 
+Before a JS install, `create` seeds the new worktree's `node_modules` with a copy-on-write
+clone of the main worktree's (APFS `clonefile`, or `cp --reflink` on btrfs/XFS), which shares
+storage extents rather than duplicating them. The install then runs normally and reconciles the
+seed against the lock file, so it stays the thing that makes the tree correct. On a 400MB
+`node_modules` this turns a cold install into a near-noop. It is skipped when the worktree
+already has a `node_modules`, and any failure falls through to a normal install.
+
 `create` is idempotent. Against a worktree that already exists it reuses it and exits 0, so
 stdout is always the path to the worktree for that target. The checkout is left untouched, but
 steps 2-4 all run again, which finishes a setup that was interrupted partway. These worktrees

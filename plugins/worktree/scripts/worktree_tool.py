@@ -6,6 +6,7 @@
 # ABOUTME: `wt` CLI to manage git worktrees under .claude/worktrees (create/list/remove/install)
 # ABOUTME: create bootstraps env files, direnv/lockfile setup, and .worktree.toml hooks
 
+import ctypes
 import fnmatch
 import json
 import os
@@ -16,6 +17,8 @@ import tomllib
 from pathlib import Path
 
 ENV_GLOBS = (".env", ".env.*", ".envrc")
+
+JS_INSTALLS = ("bun install", "pnpm install", "npm install")
 
 VERSION = "0.3.3"  # SYNC_PLUGIN_VERSION kept in step with plugin.json by scripts/sync-marketplace.ts
 
@@ -191,6 +194,50 @@ def parent_direnv_allowed(repo_root):
     return "Found RC allowed true" in text or "Found RC allowed 0" in text
 
 
+def clone_tree(src, dst):
+    """Copy-on-write clone a directory tree; True when the clone happened.
+
+    A clone shares storage extents instead of duplicating them, so a 400MB
+    node_modules costs new inodes and little else, and the first write to
+    either side copies only the blocks it touches. Unlike a hardlink, each
+    side gets its own inode, which matters because the install that follows
+    prunes and rewrites the seeded tree.
+
+    Every failure is soft: a filesystem without reflinks, an existing
+    destination, or a missing symbol all return False so the caller can carry
+    on with a normal install.
+    """
+    if sys.platform == "darwin":
+        try:
+            libc = ctypes.CDLL("/usr/lib/libSystem.dylib", use_errno=True)
+            libc.clonefile.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int)
+            libc.clonefile.restype = ctypes.c_int
+            return libc.clonefile(os.fsencode(src), os.fsencode(dst), 0) == 0
+        except (OSError, AttributeError):
+            return False
+    # --reflink=always, not auto: auto silently degrades to a real recursive
+    # copy, which costs more time than the install it is meant to save.
+    out = run(Path(src).parent, "cp", "--reflink=always", "-r",
+              str(src), str(dst), check=False)
+    return out.returncode == 0
+
+
+def seed_node_modules(repo_root, dest):
+    """Clone the main checkout's node_modules into a fresh worktree.
+
+    The install that follows is what makes the tree correct; npm prunes what
+    the lockfile does not want and repairs whatever does not match, which is
+    much cheaper than populating an empty directory. Skipped when the worktree
+    already has a node_modules, because `wt create` re-runs against live
+    worktrees to finish an interrupted setup.
+    """
+    src = Path(repo_root) / "node_modules"
+    dst = Path(dest) / "node_modules"
+    if not src.is_dir() or dst.exists():
+        return False
+    return clone_tree(src, dst)
+
+
 def bootstrap(repo_root, dest, level):
     """direnv when an .envrc is present and the parent was allowed, else lockfile setup."""
     if (dest / ".envrc").exists() and parent_direnv_allowed(repo_root):
@@ -205,6 +252,8 @@ def bootstrap(repo_root, dest, level):
         label, cmd = "npm install", ("npm", "install")
     else:
         return "no bootstrap"
+    if label in JS_INSTALLS and seed_node_modules(repo_root, dest):
+        phase(level, "seed node_modules (clone)")
     phase(level, f"bootstrap: {label}")
     out = run(dest, *cmd, check=False, capture=level < 2)
     if out.returncode != 0:
@@ -417,6 +466,12 @@ HEAD), copies gitignored .env*/.envrc from the main worktree, bootstraps
 (direnv when the parent .envrc was allowed, else uv/bun/pnpm/npm by lockfile),
 and applies any .worktree.toml hooks. Prints the path on stdout and progress on
 stderr; bootstrap output streams live at a terminal and stays quiet when piped.
+
+A JS install is seeded first with a copy-on-write clone of the main worktree's
+node_modules, which shares storage rather than copying it and leaves the
+install far less to do. The install still runs and reconciles the seed against
+the lockfile. Seeding is skipped when the worktree already has a node_modules,
+and any failure falls through to a normal install.
 
 Re-running against a worktree that already exists reuses it and exits 0, so the
 path on stdout is always the worktree for <target>. The checkout is left alone;

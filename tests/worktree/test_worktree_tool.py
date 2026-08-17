@@ -1,6 +1,7 @@
 # ABOUTME: tests for worktree_tool helpers (slug, env-file filter, hook parsing,
 # ABOUTME: verb resolution, worktree parsing) plus git-backed list/remove/install
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -229,6 +230,100 @@ def test_bootstrap_surfaces_failure(tmp_path, monkeypatch, capsys):
 
 def test_bootstrap_none_when_no_lockfile(tmp_path):
     assert wt.bootstrap(tmp_path, tmp_path, 1) == "no bootstrap"
+
+
+@pytest.fixture
+def reflink(tmp_path):
+    """Skip when the filesystem has no copy-on-write clone for clone_tree to use."""
+    probe = tmp_path / "reflink-probe"
+    probe.mkdir()
+    if not wt.clone_tree(probe, tmp_path / "reflink-probe-clone"):
+        pytest.skip("filesystem does not support copy-on-write clones")
+
+
+def test_clone_tree_copies_the_hierarchy_and_keeps_symlinks_as_symlinks(tmp_path, reflink):
+    """Dereferencing workspace links would build the main checkout's sources instead."""
+    src = tmp_path / "src"
+    (src / "pkg").mkdir(parents=True)
+    (src / "pkg" / "index.js").write_text("hi")
+    (src / "link").symlink_to("../packages/core")
+
+    assert wt.clone_tree(src, tmp_path / "dst") is True
+    dst = tmp_path / "dst"
+    assert (dst / "pkg" / "index.js").read_text() == "hi"
+    assert (dst / "link").is_symlink()
+    assert os.readlink(dst / "link") == "../packages/core"
+
+
+def test_clone_tree_fails_soft_when_the_destination_exists(tmp_path):
+    src = tmp_path / "src"
+    src.mkdir()
+    (tmp_path / "dst").mkdir()
+    assert wt.clone_tree(src, tmp_path / "dst") is False
+
+
+def test_seed_node_modules_skips_when_the_repo_has_none(tmp_path, monkeypatch):
+    repo, dest = tmp_path / "repo", tmp_path / "wt"
+    repo.mkdir()
+    dest.mkdir()
+    monkeypatch.setattr(wt, "clone_tree", lambda src, dst: pytest.fail("nothing to clone"))
+    assert wt.seed_node_modules(repo, dest) is False
+
+
+def test_seed_node_modules_skips_when_the_worktree_already_has_one(tmp_path, monkeypatch):
+    """`wt create` re-runs against a live worktree, and its node_modules is the real one."""
+    repo, dest = tmp_path / "repo", tmp_path / "wt"
+    (repo / "node_modules").mkdir(parents=True)
+    (dest / "node_modules").mkdir(parents=True)
+    monkeypatch.setattr(wt, "clone_tree", lambda src, dst: pytest.fail("must not reseed"))
+    assert wt.seed_node_modules(repo, dest) is False
+
+
+def test_seed_node_modules_clones_the_repo_tree_into_the_worktree(tmp_path, monkeypatch):
+    repo, dest = tmp_path / "repo", tmp_path / "wt"
+    (repo / "node_modules").mkdir(parents=True)
+    dest.mkdir()
+    cloned = []
+    monkeypatch.setattr(wt, "clone_tree", lambda src, dst: cloned.append((src, dst)) or True)
+
+    assert wt.seed_node_modules(repo, dest) is True
+    assert cloned == [(repo / "node_modules", dest / "node_modules")]
+
+
+def test_bootstrap_seeds_node_modules_before_a_js_install(tmp_path, monkeypatch, capsys):
+    (tmp_path / "package-lock.json").write_text("{}")
+    order = []
+    monkeypatch.setattr(wt, "seed_node_modules", lambda r, d: order.append("seed") or True)
+    monkeypatch.setattr(
+        wt, "run",
+        lambda cwd, *a, **k: order.append(" ".join(a))
+        or subprocess.CompletedProcess(list(a), 0, "", ""),
+    )
+    assert wt.bootstrap(tmp_path, tmp_path, 1) == "npm install"
+    assert order == ["seed", "npm install"]
+    assert "seed node_modules" in capsys.readouterr().err
+
+
+def test_bootstrap_does_not_seed_node_modules_for_a_python_install(tmp_path, monkeypatch):
+    """Virtualenvs bake absolute paths into pyvenv.cfg and shebangs, so .venv is out of scope."""
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'x'\n")
+    monkeypatch.setattr(wt, "seed_node_modules", lambda r, d: pytest.fail("not for .venv"))
+    monkeypatch.setattr(
+        wt, "run",
+        lambda cwd, *a, **k: subprocess.CompletedProcess(list(a), 0, "", ""),
+    )
+    assert wt.bootstrap(tmp_path, tmp_path, 1) == "uv sync"
+
+
+def test_bootstrap_still_installs_when_the_seed_fails(tmp_path, monkeypatch, capsys):
+    (tmp_path / "package-lock.json").write_text("{}")
+    monkeypatch.setattr(wt, "seed_node_modules", lambda r, d: False)
+    monkeypatch.setattr(
+        wt, "run",
+        lambda cwd, *a, **k: subprocess.CompletedProcess(list(a), 0, "", ""),
+    )
+    assert wt.bootstrap(tmp_path, tmp_path, 1) == "npm install"
+    assert "seed node_modules" not in capsys.readouterr().err
 
 
 def test_cmd_create_rejects_unknown_flag(tmp_path):
