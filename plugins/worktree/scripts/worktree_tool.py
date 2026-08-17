@@ -20,7 +20,7 @@ ENV_GLOBS = (".env", ".env.*", ".envrc")
 
 JS_INSTALLS = ("bun install", "pnpm install", "npm install")
 
-VERSION = "0.3.3"  # SYNC_PLUGIN_VERSION kept in step with plugin.json by scripts/sync-marketplace.ts
+VERSION = "0.4.0"  # SYNC_PLUGIN_VERSION kept in step with plugin.json by scripts/sync-marketplace.ts
 
 
 def run(cwd, *args, check=True, capture=True):
