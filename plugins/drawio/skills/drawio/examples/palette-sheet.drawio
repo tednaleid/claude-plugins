@@ -1,0 +1,117 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="palette" name="Dark palette">
+    <mxGraphModel dx="1400" dy="900" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1240" pageHeight="880" math="0" shadow="0" background="#0f1117">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Dark palette - saturated fills, light text, colour carried by the fill" style="text;html=1;fontSize=20;fontStyle=1;fontColor=#e8edf5;" vertex="1" parent="1">
+          <mxGeometry x="40" y="24" width="900" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="sub" value="page #0f1117  ·  text #e8edf5  ·  muted #9aa7bd  ·  body 13px  ·  title 15px" style="text;html=1;fontSize=13;fontColor=#9aa7bd;" vertex="1" parent="1">
+          <mxGeometry x="40" y="52" width="900" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s1" value="&lt;b style=&quot;color:#e8edf5&quot;&gt;Slate&lt;/b&gt;&lt;font color=&quot;#e8edf5&quot;&gt; · neutral, default box&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#9aa7bd&quot;&gt;fill #1b2130 · stroke #7d93b5&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1b2130;strokeColor=#7d93b5;fontColor=#e8edf5;fontSize=13;verticalAlign=middle;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="280" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="&lt;b style=&quot;color:#e8edf5&quot;&gt;Blue&lt;/b&gt;&lt;font color=&quot;#e8edf5&quot;&gt; · ours, primary&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#9aa7bd&quot;&gt;fill #14243f · stroke #6ea1e8&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#14243f;strokeColor=#6ea1e8;fontColor=#e8edf5;fontSize=13;verticalAlign=middle;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="340" y="100" width="280" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="&lt;b style=&quot;color:#e8edf5&quot;&gt;Teal&lt;/b&gt;&lt;font color=&quot;#e8edf5&quot;&gt; · infrastructure, transport&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#9aa7bd&quot;&gt;fill #0f2b2b · stroke #46a89d&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f2b2b;strokeColor=#46a89d;fontColor=#e8edf5;fontSize=13;verticalAlign=middle;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="640" y="100" width="280" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="s4" value="&lt;b style=&quot;color:#e8edf5&quot;&gt;Green&lt;/b&gt;&lt;font color=&quot;#e8edf5&quot;&gt; · ok, protected, allowed&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#9aa7bd&quot;&gt;fill #152a1d · stroke #5aa86a&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#152a1d;strokeColor=#5aa86a;fontColor=#e8edf5;fontSize=13;verticalAlign=middle;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="940" y="100" width="260" height="72" as="geometry" />
+        </mxCell>
+
+        <mxCell id="s5" value="&lt;b style=&quot;color:#e8edf5&quot;&gt;Amber&lt;/b&gt;&lt;font color=&quot;#e8edf5&quot;&gt; · warning, unprotected&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#9aa7bd&quot;&gt;fill #2e2410 · stroke #d9a441&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2e2410;strokeColor=#d9a441;fontColor=#e8edf5;fontSize=13;verticalAlign=middle;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="188" width="280" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="s6" value="&lt;b style=&quot;color:#e8edf5&quot;&gt;Red&lt;/b&gt;&lt;font color=&quot;#e8edf5&quot;&gt; · danger, boundary, failure&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#9aa7bd&quot;&gt;fill #331a1c · stroke #e0736b&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#331a1c;strokeColor=#e0736b;fontColor=#e8edf5;fontSize=13;verticalAlign=middle;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="340" y="188" width="280" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="s7" value="&lt;b style=&quot;color:#e8edf5&quot;&gt;Purple&lt;/b&gt;&lt;font color=&quot;#e8edf5&quot;&gt; · theirs, external, federated&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#9aa7bd&quot;&gt;fill #241d3d · stroke #9a86e0&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#241d3d;strokeColor=#9a86e0;fontColor=#e8edf5;fontSize=13;verticalAlign=middle;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="640" y="188" width="280" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="s8" value="&lt;b style=&quot;color:#e8edf5&quot;&gt;Magenta&lt;/b&gt;&lt;font color=&quot;#e8edf5&quot;&gt; · data, storage&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#9aa7bd&quot;&gt;fill #331a2b · stroke #d97ab5&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#331a2b;strokeColor=#d97ab5;fontColor=#e8edf5;fontSize=13;verticalAlign=middle;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="940" y="188" width="260" height="72" as="geometry" />
+        </mxCell>
+
+        <mxCell id="bandA" value="Band tier 1 - a swimlane tinted just enough to group, with boxes sitting on it" style="swimlane;startSize=34;html=1;whiteSpace=wrap;fillColor=#16202e;strokeColor=#4a6484;fontColor=#e8edf5;fontSize=15;fontStyle=1;align=left;spacingLeft=16;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="300" width="1160" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="bA1" value="&lt;b style=&quot;color:#e8edf5&quot;&gt;Service&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9aa7bd&quot;&gt;blue on a slate band&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#14243f;strokeColor=#6ea1e8;fontColor=#e8edf5;fontSize=13;strokeWidth=2;" vertex="1" parent="bandA">
+          <mxGeometry x="24" y="52" width="220" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="bA2" value="&lt;b style=&quot;color:#e8edf5&quot;&gt;Gateway&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9aa7bd&quot;&gt;teal, infrastructure&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f2b2b;strokeColor=#46a89d;fontColor=#e8edf5;fontSize=13;strokeWidth=2;" vertex="1" parent="bandA">
+          <mxGeometry x="300" y="52" width="220" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="bA3" value="&lt;b style=&quot;color:#e8edf5&quot;&gt;Partner&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9aa7bd&quot;&gt;purple, not ours&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#241d3d;strokeColor=#9a86e0;fontColor=#e8edf5;fontSize=13;strokeWidth=2;" vertex="1" parent="bandA">
+          <mxGeometry x="576" y="52" width="220" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="bA4" value="postgres" style="shape=cylinder3;boundedLbl=1;html=1;whiteSpace=wrap;fillColor=#331a2b;strokeColor=#d97ab5;fontColor=#e8edf5;fontSize=13;strokeWidth=2;" vertex="1" parent="bandA">
+          <mxGeometry x="852" y="46" width="220" height="84" as="geometry" />
+        </mxCell>
+        <mxCell id="eA1" value="routes /api/*" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#7d93b5;fontColor=#e8edf5;fontSize=12;labelBackgroundColor=#16202e;strokeWidth=2;" edge="1" parent="bandA" source="bA1" target="bA2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eA2" value="OIDC" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeColor=#9a86e0;fontColor=#e8edf5;fontSize=12;labelBackgroundColor=#16202e;strokeWidth=2;" edge="1" parent="bandA" source="bA2" target="bA3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="bandB" value="Band tier 2 - a second tier reads as a different layer without shouting" style="swimlane;startSize=34;html=1;whiteSpace=wrap;fillColor=#1d1a2e;strokeColor=#6a5f96;fontColor=#e8edf5;fontSize=15;fontStyle=1;align=left;spacingLeft=16;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="474" width="1160" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="bB1" value="&lt;b style=&quot;color:#e8edf5&quot;&gt;Allowed&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9aa7bd&quot;&gt;green states read as safe&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#152a1d;strokeColor=#5aa86a;fontColor=#e8edf5;fontSize=13;strokeWidth=2;" vertex="1" parent="bandB">
+          <mxGeometry x="24" y="52" width="220" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="bB2" value="&lt;b style=&quot;color:#e8edf5&quot;&gt;Unprotected&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9aa7bd&quot;&gt;amber draws the eye&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2e2410;strokeColor=#d9a441;fontColor=#e8edf5;fontSize=13;strokeWidth=2;" vertex="1" parent="bandB">
+          <mxGeometry x="300" y="52" width="220" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="bB3" value="&lt;b style=&quot;color:#e8edf5&quot;&gt;Denied&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#9aa7bd&quot;&gt;red is the boundary&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#331a1c;strokeColor=#e0736b;fontColor=#e8edf5;fontSize=13;strokeWidth=2;" vertex="1" parent="bandB">
+          <mxGeometry x="576" y="52" width="220" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="bB4" value="A note keeps muted body text and a coloured edge" style="shape=note;size=16;whiteSpace=wrap;html=1;fillColor=#1b2130;strokeColor=#d9a441;fontColor=#9aa7bd;fontSize=13;align=left;spacingLeft=10;spacingRight=20;strokeWidth=2;" vertex="1" parent="bandB">
+          <mxGeometry x="852" y="40" width="256" height="96" as="geometry" />
+        </mxCell>
+
+        <mxCell id="cap" value="Every fill above clears 12:1 against #e8edf5, so the text survives whatever the viewer does." style="text;html=1;fontSize=13;fontColor=#9aa7bd;" vertex="1" parent="1">
+          <mxGeometry x="40" y="644" width="900" height="24" as="geometry" />
+        </mxCell>
+
+        <mxCell id="acc1" value="accent #6ea1e8" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#6ea1e8;fontColor=#6ea1e8;fontSize=13;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="684" width="180" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="acc2" value="accent #5aa86a" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#5aa86a;fontColor=#5aa86a;fontSize=13;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="240" y="684" width="180" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="acc3" value="accent #d9a441" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d9a441;fontColor=#d9a441;fontSize=13;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="440" y="684" width="180" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="acc4" value="accent #e0736b" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#e0736b;fontColor=#e0736b;fontSize=13;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="640" y="684" width="180" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="acc5" value="accent #9a86e0" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#9a86e0;fontColor=#9a86e0;fontSize=13;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="840" y="684" width="180" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="acc6" value="accent #d97ab5" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d97ab5;fontColor=#d97ab5;fontSize=13;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="684" width="180" height="44" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e_demo" value="edge label on the page background" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#7d93b5;fontColor=#e8edf5;fontSize=12;labelBackgroundColor=#0f1117;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="40" y="770" as="sourcePoint" />
+            <mxPoint x="600" y="770" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_demo2" value="dashed, secondary relationship" style="edgeStyle=orthogonalEdgeStyle;html=1;dashed=1;strokeColor=#9a86e0;fontColor=#e8edf5;fontSize=12;labelBackgroundColor=#0f1117;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="640" y="770" as="sourcePoint" />
+            <mxPoint x="1200" y="770" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
