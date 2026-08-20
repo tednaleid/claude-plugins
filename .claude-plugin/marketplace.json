@@ -26,7 +26,7 @@
       "name": "drawio",
       "source": "./plugins/drawio",
       "description": "Author draw.io diagrams that are readable and correct, then prove it by looking at them. Bundles a drawio_tool script that exports any page to PNG through the desktop app's Electron binary so the agent can Read its own render, plus a linter for the defects a render cannot show. draw.io's desktop app, VS Code extension, and CLI export resolve colour defaults differently, so the linter measures contrast against whatever actually sits behind each label, flags bold runs that inherit a colour a renderer will override, and reports text overflow, occluding geometry, double-escaped markup, and missing page backgrounds. Includes verified dark and light palettes.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "Ted Naleid"
       },

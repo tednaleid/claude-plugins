@@ -67,6 +67,11 @@ Five requirements, each because the default is not what you would guess:
 - **`mxGraphModel` sets `background`.** Otherwise the export inherits the
   viewer's backdrop, and the one surface everything is composed against is the
   one thing you left unspecified.
+- **A dark page also gets a locked backdrop rectangle as its first cell.**
+  `background` is a model property, not a shape, so an exporter that composes
+  its own backdrop can drop it. When that happens the filled boxes survive and
+  every unfilled text cell vanishes. A rectangle cannot be dropped. See
+  `references/palette.md` for the style string and sizing.
 - **Shapes and edges set `strokeWidth=2`.** The default of 1 is thin against a
   saturated fill and thinner still once the image is scaled into a document.
 
@@ -77,9 +82,12 @@ Five requirements, each because the default is not what you would guess:
 ```
 
 Checks well-formedness, contrast against whatever is actually behind each
-label, double-escaped markup, likely text overflow, shapes covered by shapes
-drawn after them, unresolved template placeholders, and a missing page
-background. Errors mean the diagram is broken; warnings want a look.
+label, bold runs that inherit a colour a renderer will override, double-escaped
+markup, text that will overflow its box and boxes far too large for their text,
+shapes covered by shapes drawn after them, small shapes straddling a border,
+children flush against a container edge, a dark page with no backdrop
+rectangle, unresolved template placeholders, and a missing page background.
+Errors mean the diagram is broken; warnings want a look.
 
 Run this first. It is seconds, and it catches the class that a render cannot
 show you.
@@ -90,9 +98,14 @@ show you.
 "${CLAUDE_PLUGIN_ROOT}/scripts/drawio_tool.py" export diagram.drawio --all --scale 2
 ```
 
-`--scale 2` because 11 to 13px labels are not reliably readable at 1x when you
-read the image back. Use `--page N` for a single page (1-based). Export is slow
-to start because it boots Electron; allow a generous timeout.
+Use `--page N` for a single page (1-based). Export is slow to start because it
+boots Electron; allow a generous timeout.
+
+**Pick the scale from the canvas width.** Under about 1500px use `--scale 2`,
+because 11 to 13px labels are not reliably readable at 1x when you read the
+image back. Above it use `--scale 1`: a 3150x2720 page at scale 2 is 6300x5440,
+which gets downsampled to a fixed width for reading anyway, so the extra pixels
+cost detail rather than adding it.
 
 If it fails with `bootstrap_look_up ... MachPortRendezvousServer: Permission
 denied (1100)`, Electron is being denied the Mach ports it needs. That is a
@@ -115,10 +128,21 @@ Check specifically:
   and confirm you can still see it.
 - Is the whole thing legible at the size it will actually be viewed?
 
+**The render is authoritative about appearance. The XML is authoritative about
+existence.** Do not use one to answer the other's question. A downsampled export
+of a large page will convince you that elements failed to render when they are
+present and correct; grep the XML for the id before acting on a "missing"
+element, and never conclude a colour is right from reading the style string.
+
 ### 6. Fix and re-verify
 
 After any edit, lint and export and look again. A fix that moves a box moves
 whatever that box was next to.
+
+Re-lint after any global change in particular. Bumping every font size by two
+points pushes exactly one label over its box, and the overflow estimator finds
+it in under a second. That class is tedious to spot in a render and free to
+catch mechanically.
 
 ## Do not skip the look
 

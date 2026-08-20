@@ -17,7 +17,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "0.1.0"  # SYNC_PLUGIN_VERSION kept in step with plugin.json by scripts/sync-marketplace.ts
+VERSION = "0.2.0"  # SYNC_PLUGIN_VERSION kept in step with plugin.json by scripts/sync-marketplace.ts
 
 # Where the Electron binary lives when `drawio` is not on PATH. The Homebrew
 # cask adds a shim, but a .dmg install leaves only the bundle.
@@ -48,6 +48,20 @@ CONTRAST_WARN = 4.5
 CHAR_WIDTH_RATIO = 0.52
 LINE_HEIGHT_RATIO = 1.35
 VERTICAL_PADDING = 8.0
+
+# A box several times taller than its copy reads as a failure to load. Only
+# applied above a minimum height so badges and one-line chips do not trip it.
+UNDERFILL_RATIO = 0.5
+UNDERFILL_MIN_HEIGHT = 150.0
+
+# Inset a container's children need before they stop looking flush.
+CONTAINER_PADDING = 15.0
+
+# A small shape hanging over the border of a larger one, as a fraction of the
+# small shape. Between these bounds it straddles rather than sits inside.
+STRADDLE_MIN = 0.05
+STRADDLE_MAX = 0.95
+STRADDLE_MAX_AREA_RATIO = 0.25
 
 PLACEHOLDER_RE = re.compile(r"\{\{[^}]*\}\}|\{[A-Z][A-Z0-9_]{2,}\}|\bTODO\b|\bFIXME\b|\bXXX\b")
 TAG_RE = re.compile(r"<[^>]+>")
@@ -241,29 +255,36 @@ def check_contrast(page_name, cell, style, page_bg, findings):
     )
 
 
-def check_overflow(page_name, cell, style, findings):
-    """Will the label fit? draw.io never grows a box to make room.
+def label_metrics(cell, style):
+    """How much room the label wants against how much the shape gives it.
 
-    Without wrapping the text runs out the sides; with `whiteSpace=wrap` it
-    spills past the top and bottom border; with `overflow=hidden` it is cut off
-    with no visual cue at all, which is the only silent case.
+    Crude by necessity: it models a proportional face at one weight and knows
+    nothing about a note's folded corner or a cylinder's cap. Good enough to
+    separate "obviously will not fit" from "obviously swimming in space", which
+    are the two ends a render makes you squint at.
     """
     if cell.get("vertex") != "1":
-        return
+        return None
     text = plain_text(cell.get("value"))
     if not text:
-        return
+        return None
     geo = geometry_of(cell)
     if not geo:
-        return
+        return None
     _, _, w, h = geo
     if w <= 0 or h <= 0:
-        return
+        return None
 
     try:
         font_size = float(style.get("fontSize") or DEFAULT_FONT_SIZE)
     except (TypeError, ValueError):
         font_size = DEFAULT_FONT_SIZE
+
+    # `horizontal=0` rotates the label, so the text flows along the shape's
+    # height and wraps against its width. Swap them rather than reading a tall
+    # vertical band label as a wildly underfilled box.
+    if style.get("horizontal") == "0":
+        w, h = h, w
 
     # A swimlane's label lives in its title bar, not the whole shape.
     if style.get("swimlane"):
@@ -283,8 +304,30 @@ def check_overflow(page_name, cell, style, findings):
     # N line-heights fits N-1 lines and clips the last one.
     lines_available = max(int((h - VERTICAL_PADDING) / line_h), 1)
 
-    if lines_needed <= lines_available:
+    return {
+        "text": text,
+        "font_size": font_size,
+        "width": w,
+        "height": h,
+        "line_height": line_h,
+        "lines_needed": lines_needed,
+        "lines_available": lines_available,
+        "text_height": lines_needed * line_h + VERTICAL_PADDING,
+    }
+
+
+def check_overflow(page_name, cell, style, findings):
+    """Will the label fit? draw.io never grows a box to make room.
+
+    Without wrapping the text runs out the sides; with `whiteSpace=wrap` it
+    spills past the top and bottom border; with `overflow=hidden` it is cut off
+    with no visual cue at all, which is the only silent case.
+    """
+    m = label_metrics(cell, style)
+    if m is None or m["lines_needed"] <= m["lines_available"]:
         return
+    text, font_size, w, h = m["text"], m["font_size"], m["width"], m["height"]
+    lines_needed, lines_available = m["lines_needed"], m["lines_available"]
 
     hidden = style.get("overflow") == "hidden"
     level = "error" if hidden else "warn"
@@ -305,6 +348,145 @@ def check_overflow(page_name, cell, style, findings):
     )
 
 
+def check_underfilled(page_name, cell, style, container_ids, findings):
+    """The opposite of overflow, and the one the render makes you squint at.
+
+    "Over-allocate height" pushes toward boxes several times taller than their
+    copy, which read as something that failed to load. The linter is silent on
+    an empty box unless it looks for one, so this is the inverse of the overflow
+    check: size boxes once the copy is final, then confirm on the render.
+    """
+    # A shape sized to hold other things is not underfilled, whatever its own
+    # label does. That covers XML parents, bands drawn as a backdrop for
+    # siblings painted on top, and a lifeline whose height is the timeline.
+    if cell.get("id") in container_ids or style.get("swimlane"):
+        return
+    if style.get("shape") == "umlLifeline":
+        return
+    m = label_metrics(cell, style)
+    if m is None:
+        return
+    h = m["height"]
+    if h < UNDERFILL_MIN_HEIGHT:
+        return
+    ratio = m["text_height"] / h
+    if ratio >= UNDERFILL_RATIO:
+        return
+    findings.append(
+        Finding(
+            "warn",
+            "underfilled",
+            page_name,
+            cell.get("id", "?"),
+            f"about {m['text_height']:.0f}px of text in a {h:g}px box "
+            f"({100 * ratio:.0f}% full); an empty-looking box reads as a "
+            f"failure to load",
+        )
+    )
+
+
+def check_container_padding(page_name, cells, findings):
+    """A child flush against its container's border reads as a rendering bug.
+
+    Container children use coordinates relative to the container, so this is a
+    direct comparison. A swimlane's usable top edge is its title bar, not zero.
+    """
+    by_id = {c.get("id"): c for c in cells}
+    for cell in cells:
+        if cell.get("vertex") != "1":
+            continue
+        parent = by_id.get(cell.get("parent"))
+        if parent is None or parent.get("vertex") != "1":
+            continue
+        geo, pgeo = geometry_of(cell), geometry_of(parent)
+        if not geo or not pgeo:
+            continue
+        gnode = cell.find("mxGeometry")
+        if (gnode.get("relative") or "0") == "1":
+            continue
+        x, y, w, h = geo
+        _, _, pw, ph = pgeo
+
+        pstyle = parse_style(parent.get("style"))
+        top = 0.0
+        if pstyle.get("swimlane"):
+            try:
+                top = float(pstyle.get("startSize") or 23)
+            except (TypeError, ValueError):
+                top = 23.0
+
+        gaps = {
+            "left": x,
+            "top": y - top,
+            "right": pw - (x + w),
+            "bottom": ph - (y + h),
+        }
+        tight = {k: v for k, v in gaps.items() if v < CONTAINER_PADDING}
+        if not tight:
+            continue
+        worst = min(tight, key=lambda k: tight[k])
+        findings.append(
+            Finding(
+                "warn",
+                "container-padding",
+                page_name,
+                cell.get("id", "?"),
+                f"sits {gaps[worst]:.0f}px from the {worst} edge of "
+                f"{parent.get('id', '?')} (want {CONTAINER_PADDING:g}px); flush "
+                f"children read as a rendering bug",
+            )
+        )
+
+
+def check_backdrop(page_name, model, cells, findings):
+    """A non-default page background needs a real rectangle behind the content.
+
+    `background` on `mxGraphModel` is honoured by the CLI export, but it is a
+    model property rather than a shape, so anything that composes its own
+    backdrop can ignore it. When that happens the boxes survive, because they
+    carry their own `fillColor`, and every unfilled text cell disappears. A
+    rectangle painted first is a shape, so nothing can drop it, and it also pins
+    the exported extent to the page rather than to the content bounds.
+
+    Only checked when the page actually declares a dark background, since a
+    diagram on white already matches everyone's default.
+    """
+    bg = parse_color(model.get("background"))
+    if bg is None or relative_luminance(bg) > 0.5:
+        return
+
+    tops = []
+    for cell in cells:
+        if cell.get("vertex") != "1" or cell.get("parent") != "1":
+            continue
+        geo = geometry_of(cell)
+        if not geo or geo[2] <= 0 or geo[3] <= 0:
+            continue
+        tops.append((cell, geo))
+    if len(tops) < 2:
+        return
+
+    first, fgeo = tops[0]
+    fstyle = parse_style(first.get("style"))
+    covers = all(contains(fgeo, geo, slack=0.0) for _, geo in tops[1:])
+    opaque = fstyle.get("fillColor") not in (None, "none")
+
+    if covers and opaque:
+        return
+
+    findings.append(
+        Finding(
+            "warn",
+            "no-backdrop",
+            page_name,
+            first.get("id", "?"),
+            f"page declares background {model.get('background')} but the first "
+            f"shape is not an opaque rectangle covering the content; unfilled "
+            f"text cells vanish wherever that background is not applied",
+        )
+    )
+
+
 def contains(outer, inner, slack=1.0):
     ox, oy, ow, oh = outer
     ix, iy, iw, ih = inner
@@ -314,6 +496,35 @@ def contains(outer, inner, slack=1.0):
         and ix + iw <= ox + ow + slack
         and iy + ih <= oy + oh + slack
     )
+
+
+def backdrop_ids(cells):
+    """Vertices that fully contain a sibling painted after them.
+
+    That is the signature of a band or group drawn as a background rectangle
+    rather than as a real container, which is common and invisible to anything
+    that only reads the `parent` attribute.
+    """
+    by_parent = {}
+    for cell in cells:
+        if cell.get("vertex") != "1":
+            continue
+        geo = geometry_of(cell)
+        if not geo or geo[2] <= 0 or geo[3] <= 0:
+            continue
+        gnode = cell.find("mxGeometry")
+        if (gnode.get("relative") or "0") == "1":
+            continue
+        by_parent.setdefault(cell.get("parent"), []).append((cell, geo))
+
+    found = set()
+    for siblings in by_parent.values():
+        for i, (under, gu) in enumerate(siblings):
+            for _, go in siblings[i + 1 :]:
+                if contains(gu, go):
+                    found.add(under.get("id"))
+                    break
+    return found
 
 
 def check_overlap(page_name, cells, findings):
@@ -374,6 +585,27 @@ def check_overlap(page_name, cells, findings):
                             under.get("id", "?"),
                             f"is {100 * covered:.0f}% covered by {over.get('id', '?')} "
                             f"({area:.0f}px^2), which is drawn on top of it",
+                        )
+                    )
+                else:
+                    # A step marker or badge hanging off the edge of a band
+                    # covers too little of it to register above, but the
+                    # straddle is the whole defect. Judge it from the small
+                    # shape instead.
+                    over_area = ow * oh
+                    if over_area > STRADDLE_MAX_AREA_RATIO * under_area:
+                        continue
+                    inside = area / over_area
+                    if not STRADDLE_MIN <= inside <= STRADDLE_MAX:
+                        continue
+                    findings.append(
+                        Finding(
+                            "warn",
+                            "straddle",
+                            page_name,
+                            over.get("id", "?"),
+                            f"is {100 * inside:.0f}% inside {under.get('id', '?')}, so it "
+                            f"sits across that border rather than in or out of it",
                         )
                     )
 
@@ -504,14 +736,22 @@ def lint_file(path):
 
         root = model.find("root")
         cells = list(root.iter("mxCell")) if root is not None else []
+        # A cell holding children is sized for them, not for its own label.
+        # Bands are often drawn as a backdrop with their contents as siblings
+        # painted on top, so XML parentage alone does not find them.
+        container_ids = {c.get("parent") for c in cells if c.get("parent")}
+        container_ids |= backdrop_ids(cells)
         for cell in cells:
             style = parse_style(cell.get("style"))
             check_contrast(name, cell, style, page_bg, findings)
             check_overflow(name, cell, style, findings)
+            check_underfilled(name, cell, style, container_ids, findings)
             check_escaping(name, cell, findings)
             check_markup_colors(name, cell, findings)
             check_placeholders(name, cell, findings)
         check_overlap(name, cells, findings)
+        check_container_padding(name, cells, findings)
+        check_backdrop(name, model, cells, findings)
 
     order = {"error": 0, "warn": 1}
     findings.sort(key=lambda f: (order[f.level], f.check, f.page))

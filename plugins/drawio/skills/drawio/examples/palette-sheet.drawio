@@ -5,6 +5,10 @@
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
 
+        <mxCell id="backdrop" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#0f1117;strokeColor=none;movable=0;resizable=0;rotatable=0;deletable=0;editable=0;connectable=0;" vertex="1" parent="1">
+          <mxGeometry x="0" y="0" width="1240" height="880" as="geometry" />
+        </mxCell>
+
         <mxCell id="title" value="Dark palette - saturated fills, light text, colour carried by the fill" style="text;html=1;fontSize=20;fontStyle=1;fontColor=#e8edf5;" vertex="1" parent="1">
           <mxGeometry x="40" y="24" width="900" height="30" as="geometry" />
         </mxCell>
@@ -51,7 +55,7 @@
           <mxGeometry x="576" y="52" width="220" height="72" as="geometry" />
         </mxCell>
         <mxCell id="bA4" value="postgres" style="shape=cylinder3;boundedLbl=1;html=1;whiteSpace=wrap;fillColor=#331a2b;strokeColor=#d97ab5;fontColor=#e8edf5;fontSize=13;strokeWidth=2;" vertex="1" parent="bandA">
-          <mxGeometry x="852" y="46" width="220" height="84" as="geometry" />
+          <mxGeometry x="852" y="52" width="220" height="72" as="geometry" />
         </mxCell>
         <mxCell id="eA1" value="routes /api/*" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#7d93b5;fontColor=#e8edf5;fontSize=12;labelBackgroundColor=#16202e;strokeWidth=2;" edge="1" parent="bandA" source="bA1" target="bA2">
           <mxGeometry relative="1" as="geometry" />
@@ -73,7 +77,7 @@
           <mxGeometry x="576" y="52" width="220" height="72" as="geometry" />
         </mxCell>
         <mxCell id="bB4" value="A note keeps muted body text and a coloured edge" style="shape=note;size=16;whiteSpace=wrap;html=1;fillColor=#1b2130;strokeColor=#d9a441;fontColor=#9aa7bd;fontSize=13;align=left;spacingLeft=10;spacingRight=20;strokeWidth=2;" vertex="1" parent="bandB">
-          <mxGeometry x="852" y="40" width="256" height="96" as="geometry" />
+          <mxGeometry x="852" y="52" width="256" height="72" as="geometry" />
         </mxCell>
 
         <mxCell id="cap" value="Every fill above clears 12:1 against #e8edf5, so the text survives whatever the viewer does." style="text;html=1;fontSize=13;fontColor=#9aa7bd;" vertex="1" parent="1">

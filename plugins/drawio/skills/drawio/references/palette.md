@@ -88,6 +88,53 @@ Set `background` on `mxGraphModel`. Without it the export inherits whatever
 backdrop the viewer supplies, so the one thing every element is composed
 against is the one thing you did not specify.
 
+## A dark page also needs a real rectangle
+
+`background` is a model property, not a shape. The CLI export honours it, but
+anything that composes its own backdrop can ignore it, and the desktop app's
+File > Export As dialog is reported to do exactly that.
+
+The symptom is distinctive, and it is what makes this worth a rule: **the boxes
+survive and the page-level text disappears.** Anything with its own `fillColor`
+is unaffected; every `fillColor=none` text cell (page title, subtitle, section
+headings, free-floating captions) renders dark on dark. If a reviewer says "some
+of the text is missing" and the boxes look fine, this is almost always it, and
+it is not a `fontColor` bug.
+
+Emit a backdrop as the **first cell of every page**:
+
+```xml
+<mxCell id="backdrop" value=""
+  style="rounded=0;whiteSpace=wrap;html=1;fillColor=#0f1117;strokeColor=none;
+         movable=0;resizable=0;rotatable=0;deletable=0;editable=0;connectable=0;"
+  vertex="1" parent="1">
+  <mxGeometry x="0" y="0" width="{W}" height="{H}" as="geometry"/>
+</mxCell>
+```
+
+- **The lock flags are not decoration.** Without them the rectangle is the
+  easiest thing on the canvas to select and drag, being underneath everything
+  and filling the page.
+- **Size it from content bounds, not just `pageWidth`/`pageHeight`.** Use
+  `max(pageWidth, maxX + margin)` across every vertex. A page whose content
+  outgrew its declared size gets a bright strip down one edge, which reads as a
+  rendering artefact and is worse than no backdrop.
+- **Keep `background` as well.** It is what makes the editor canvas look right
+  while authoring. The rectangle is for everyone else.
+
+A useful side effect: the rectangle pins the exported extent to the page.
+Without it the exporter crops to content, so the same page exports at a
+different size as its contents change.
+
+`drawio_tool lint` reports this as `no-backdrop`, and only for pages that
+declare a dark background, since a diagram on white already matches every
+renderer's default.
+
+Do not try to verify this with `--transparent`. That was measured and it does
+not discriminate: the CLI honours `background` either way, so a file with no
+backdrop still exports opaque with the right corner pixel. The lint rule is the
+check.
+
 ## What `--theme dark` does
 
 It applies a lightness inversion across fill, stroke, background and
@@ -196,16 +243,48 @@ otherwise it reads as inconsistency.
 ## Type sizes
 
 draw.io defaults to 12px, which is small once a diagram is scaled down into a
-document and small enough that an agent reading its own export at `--scale 2`
-can struggle. Start at:
+document. A baseline for a canvas up to about 1200px wide:
 
 | Role | Size |
 |---|---|
 | Page title | 20px, `fontStyle=1` |
+| Page subtitle | 14px |
 | Band or section title | 15px, `fontStyle=1` |
-| Box label | 13px |
+| Box heading | 13px, bold |
+| Box body | 13px |
 | Edge label | 12px |
+| Prose beneath the diagram | 15px |
+
+**Point size is the wrong unit, so scale these with the canvas.** Legibility
+depends on how far the page is scaled down when it is consumed: a 3100px-wide
+diagram pasted into a document at 1000px is being read at about a third. At
+2500-3500px add 40-60% to every row. On one 3100px build the table above needed
+the page title at 30, band titles at 21, box headings at 21-27, body at 19-20
+and edge labels at 14-17 before a reviewer stopped asking for it bigger.
+
+Set the body size first, then everything else relative to it, and check
+container titles and captions **last**. Two inversions are easy to create by
+bumping one row at a time, and both look wrong even though every individual
+size is defensible:
+
+- **A container's title must not be smaller than the text inside it.** Bumping
+  box text without bumping the band title leaves the band heading shrinking into
+  its own contents.
+- **Prose beneath a diagram must not be larger than the diagram's own detail
+  lines**, or the caption out-shouts the thing it is captioning.
 
 Use `fontStyle=1` (bold) for the first line of a box and a `<font color>` span
 in the muted color for the detail lines. That gives a readable hierarchy inside
-a box without a second shape.
+a box without a second shape. Note that a bare `<b>` needs its own inline
+colour, as above.
+
+Render hostnames, URL paths, JSON fragments and identifiers in monospace:
+
+```
+<font style="font-family:monospace">/api/v1/me/access</font>
+```
+
+It separates a literal from prose at a glance and stops a reader parsing
+`/api/v1/me/access` as English. Monospace reads about one step smaller than the
+same nominal size in the body face, so bump it or accept the de-emphasis
+deliberately.

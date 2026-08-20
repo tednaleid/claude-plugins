@@ -316,6 +316,170 @@ def test_cells_in_different_parents_are_not_compared(tmp_path):
     assert ids(lint_source(tmp_path, src), "overlap") == []
 
 
+def test_small_shape_straddling_a_border_warns(tmp_path):
+    """A step marker hanging off a band covers too little of it to register as
+    an overlap, but the straddle is the whole defect."""
+    src = diagram(
+        box("band", "rounded=0;fillColor=#16202e;fontColor=#e8edf5;",
+            value="Layer", x=0, y=0, w=800, h=300)
+        + box("marker", "ellipse;fillColor=#d9a441;fontColor=#0f1117;",
+              value="3", x=100, y=280, w=56, h=56)
+    )
+    findings = lint_source(tmp_path, src)
+    assert ids(findings, "straddle") == ["marker"]
+
+
+def test_shape_fully_inside_does_not_straddle(tmp_path):
+    src = diagram(
+        box("band", "rounded=0;fillColor=#16202e;fontColor=#e8edf5;",
+            value="Layer", x=0, y=0, w=800, h=300)
+        + box("marker", "ellipse;fillColor=#d9a441;fontColor=#0f1117;",
+              value="3", x=100, y=100, w=56, h=56)
+    )
+    assert ids(lint_source(tmp_path, src), "straddle") == []
+
+
+# --------------------------------------------------------------------------
+# underfilled
+# --------------------------------------------------------------------------
+
+
+def test_tall_sparse_box_warns(tmp_path):
+    """The inverse of overflow: a box several times taller than its copy."""
+    src = diagram(
+        box("b", "rounded=1;whiteSpace=wrap;fillColor=#14243f;fontColor=#e8edf5;",
+            value="Two short lines of copy.", w=600, h=300)
+    )
+    findings = lint_source(tmp_path, src)
+    assert ids(findings, "underfilled") == ["b"]
+    assert [f.level for f in findings if f.check == "underfilled"] == ["warn"]
+
+
+def test_well_filled_box_passes(tmp_path):
+    src = diagram(
+        box("b", "rounded=1;whiteSpace=wrap;fillColor=#14243f;fontColor=#e8edf5;",
+            value="x" * 900, w=600, h=200)
+    )
+    assert ids(lint_source(tmp_path, src), "underfilled") == []
+
+
+def test_short_box_is_exempt_so_badges_do_not_trip_it(tmp_path):
+    src = diagram(
+        box("b", "rounded=1;whiteSpace=wrap;fillColor=#14243f;fontColor=#e8edf5;",
+            value="3", w=56, h=56)
+    )
+    assert ids(lint_source(tmp_path, src), "underfilled") == []
+
+
+def test_a_container_is_sized_for_its_children_not_its_label(tmp_path):
+    src = diagram(
+        box("band", "swimlane;startSize=34;fillColor=#16202e;fontColor=#e8edf5;",
+            value="Layer 1", x=0, y=0, w=800, h=400)
+        + box("child", "rounded=1;fillColor=#14243f;fontColor=#e8edf5;",
+              value="Inside", x=40, y=60, w=200, h=72, parent="band")
+    )
+    assert ids(lint_source(tmp_path, src), "underfilled") == []
+
+
+# --------------------------------------------------------------------------
+# container padding
+# --------------------------------------------------------------------------
+
+
+def test_child_flush_against_its_container_warns(tmp_path):
+    src = diagram(
+        box("band", "rounded=0;fillColor=#16202e;fontColor=#e8edf5;",
+            value="Layer", x=0, y=0, w=800, h=300)
+        + box("child", "rounded=1;fillColor=#14243f;fontColor=#e8edf5;",
+              value="Inside", x=0, y=0, w=200, h=72, parent="band")
+    )
+    findings = lint_source(tmp_path, src)
+    assert ids(findings, "container-padding") == ["child"]
+
+
+def test_inset_child_passes(tmp_path):
+    src = diagram(
+        box("band", "rounded=0;fillColor=#16202e;fontColor=#e8edf5;",
+            value="Layer", x=0, y=0, w=800, h=300)
+        + box("child", "rounded=1;fillColor=#14243f;fontColor=#e8edf5;",
+              value="Inside", x=40, y=40, w=200, h=72, parent="band")
+    )
+    assert ids(lint_source(tmp_path, src), "container-padding") == []
+
+
+def test_swimlane_top_padding_is_measured_from_the_title_bar(tmp_path):
+    """y=40 clears the frame but sits only 6px under a 34px title bar."""
+    src = diagram(
+        box("band", "swimlane;startSize=34;fillColor=#16202e;fontColor=#e8edf5;",
+            value="Layer", x=0, y=0, w=800, h=300)
+        + box("child", "rounded=1;fillColor=#14243f;fontColor=#e8edf5;",
+              value="Inside", x=40, y=40, w=200, h=72, parent="band")
+    )
+    findings = lint_source(tmp_path, src)
+    assert ids(findings, "container-padding") == ["child"]
+    assert "top edge" in findings[0].message
+
+
+# --------------------------------------------------------------------------
+# backdrop
+# --------------------------------------------------------------------------
+
+
+def test_dark_page_without_a_backdrop_rectangle_warns(tmp_path):
+    src = diagram(
+        box("t", "text;html=1;fontColor=#e8edf5;", value="Title", x=20, y=20, w=300, h=30)
+        + box("b", "rounded=1;fillColor=#14243f;fontColor=#e8edf5;",
+              value="Box", x=20, y=80, w=300, h=60)
+    )
+    findings = lint_source(tmp_path, src)
+    assert ids(findings, "no-backdrop") == ["t"]
+
+
+def test_backdrop_rectangle_satisfies_the_check(tmp_path):
+    src = diagram(
+        box("bg", "rounded=0;fillColor=#0f1117;strokeColor=none;", value="",
+            x=0, y=0, w=400, h=200)
+        + box("t", "text;html=1;fontColor=#e8edf5;", value="Title", x=20, y=20, w=300, h=30)
+        + box("b", "rounded=1;fillColor=#14243f;fontColor=#e8edf5;",
+              value="Box", x=20, y=80, w=300, h=60)
+    )
+    assert ids(lint_source(tmp_path, src), "no-backdrop") == []
+
+
+def test_backdrop_must_actually_cover_the_content(tmp_path):
+    """A page whose content outgrew its declared size gets a bright strip."""
+    src = diagram(
+        box("bg", "rounded=0;fillColor=#0f1117;strokeColor=none;", value="",
+            x=0, y=0, w=200, h=200)
+        + box("t", "text;html=1;fontColor=#e8edf5;", value="Title", x=20, y=20, w=300, h=30)
+        + box("b", "rounded=1;fillColor=#14243f;fontColor=#e8edf5;",
+              value="Box", x=20, y=80, w=300, h=60)
+    )
+    assert ids(lint_source(tmp_path, src), "no-backdrop") == ["bg"]
+
+
+def test_transparent_first_shape_is_not_a_backdrop(tmp_path):
+    src = diagram(
+        box("bg", "rounded=0;fillColor=none;strokeColor=none;", value="",
+            x=0, y=0, w=400, h=200)
+        + box("t", "text;html=1;fontColor=#e8edf5;", value="Title", x=20, y=20, w=300, h=30)
+        + box("b", "rounded=1;fillColor=#14243f;fontColor=#e8edf5;",
+              value="Box", x=20, y=80, w=300, h=60)
+    )
+    assert ids(lint_source(tmp_path, src), "no-backdrop") == ["bg"]
+
+
+def test_light_page_needs_no_backdrop(tmp_path):
+    """White already matches every renderer's default, so there is nothing to lose."""
+    src = diagram(
+        box("t", "text;html=1;fontColor=#101010;", value="Title", x=20, y=20, w=300, h=30)
+        + box("b", "rounded=1;fillColor=#e3edfb;fontColor=#101010;",
+              value="Box", x=20, y=80, w=300, h=60),
+        background="#ffffff",
+    )
+    assert ids(lint_source(tmp_path, src), "no-backdrop") == []
+
+
 # --------------------------------------------------------------------------
 # escaping, placeholders, structure
 # --------------------------------------------------------------------------
