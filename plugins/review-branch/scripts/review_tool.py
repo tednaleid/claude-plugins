@@ -292,6 +292,30 @@ def tldr_html(tldr: dict) -> str:
     return '<div class="tldr">\n' + "\n".join(cells) + "\n</div>"
 
 
+# The labels only exist in the renderer, so an author cannot see that their value
+# landed under a noun. These openers answer a question the page never shows.
+_ANSWER_OPENER = re.compile(
+    r"^\s*(?:(?:yes|no|nope|yep)\s*[,.;:]"
+    r"|none of (?:it|this|them)\b"
+    r"|not really\b"
+    r"|it (?:does|is|isn't|doesn't|will|won't)\b)",
+    re.I,
+)
+
+
+def tldr_warnings(tldr: dict) -> list[str]:
+    out = []
+    for key, label in _TLDR_ROWS:
+        value = tldr.get(key)
+        match = _ANSWER_OPENER.match(value) if isinstance(value, str) else None
+        if match:
+            out.append(
+                f"[tldr] {key} opens with {match.group().strip()!r}, answering a question "
+                f"the page never shows; it renders as prose under the label {label}"
+            )
+    return out
+
+
 def minor_html(minor: list[dict]) -> str:
     if not minor:
         return ""
@@ -988,6 +1012,8 @@ def render_html(round_dir: Path, served: bool) -> str:
 def cmd_render(round_dir: Path) -> Path:
     out = round_dir / "review.html"
     out.write_text(render_html(round_dir, served=False))
+    for warning in tldr_warnings(load_review(round_dir).get("tldr", {})):
+        print(f"warning: {warning}", file=sys.stderr)
     rid, slug, rnd = route_for(round_dir).split("/")
     data_commit(f"{rid} {slug} {rnd}: render")
     return out

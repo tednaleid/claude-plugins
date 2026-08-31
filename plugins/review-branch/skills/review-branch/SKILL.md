@@ -213,14 +213,31 @@ evidence, not a source: it was written by someone deep in the context and
 assuming it. Where the description and the code disagree, the code wins and the
 tl;dr says so.
 
+Each value is prose under a noun, not an answer to a question. The page renders
+the four scalars beside the labels What, Why, Scope and Today, with no question
+anywhere on it, so a value opening "Yes", "No", "None of it" or "It does"
+answers something the reader cannot see:
+
+    TODAY   Yes, and it is the first in this series. read-only becomes
+            producible for the first time.
+
+Start with the subject and the label completes itself:
+
+    TODAY   Administrators gain a level control in Grant Management, and the
+            grant chips start showing the level beside the module name.
+
+A no-op change still gets a full value, because "nothing changes" is a claim a
+reviewer will want to check: "Nothing changes for any user. Every existing row
+backfills to read-write, which is what a grant already meant."
+
 One or two sentences per field:
 
 | Field | Contains |
 |---|---|
-| `what` | What the change makes true that was not true before, in plain terms. |
-| `why` | The problem it solves: what was broken, missing, or impossible. |
-| `scope` | The surfaces a reviewer is actually looking at - which layers and files, and how wide. |
-| `behavior_change` | Whether anything changes for a user today, and what. A no-op refactor and a live behavior change need different reading; say which this is. |
+| `what` | The change stated as a new capability or fact: what is true now that was not. |
+| `why` | The problem it solves: what was broken, missing, or impossible before. |
+| `scope` | The surfaces a reviewer is looking at - which layers and files, and how wide. |
+| `behavior_change` | What a user sees differently today, or a statement that nothing changes and why not. A no-op refactor and a live behavior change need different reading; the value says which without being asked. |
 
 Add a `[[tldr.terms]]` entry for every word in `what` or `why` that is neither
 ordinary English nor already established vocabulary in this codebase. A term
@@ -229,6 +246,10 @@ avoid it. Omit the array when the change coins no vocabulary.
 
 Say the thing rather than pointing at it: no bare "criterion 8", no ticket
 number standing alone, no "as discussed". The reader has none of those to hand.
+The tl;dr also renders above the findings, so a finding id (`f3`, `g7`) or a
+phrase like "the gaps this review flagged" points at something the reader has
+not reached yet. Describe the thing; the findings below will name it.
+References to other merge requests are fine once `scope` has placed them.
 
 When the MR/PR description or sibling branches sharing the ticket prefix show
 this is one of several dependent changes, `scope` names the position: which one

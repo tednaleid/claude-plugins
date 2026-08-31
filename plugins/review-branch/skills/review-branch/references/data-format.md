@@ -36,7 +36,7 @@ The data root is a git repo. Every write the tool itself performs (render, brows
     what = "One or two sentences: what this change makes true that was not true before."
     why = "One or two sentences: the problem it solves - what was broken, missing, or impossible."
     scope = "The surfaces a reviewer is actually looking at."
-    behavior_change = "Whether anything changes for a user today, and what."
+    behavior_change = "What a user sees differently today, or that nothing changes and why not."
 
     [[tldr.terms]]            # optional; omit entirely when the change coins no vocabulary
     term = "level"
@@ -93,7 +93,10 @@ The data root is a git repo. Every write the tool itself performs (render, brows
 Prose fields are markdown (commonmark plus tables). The renderer escapes
 everything else; never pre-escape content. The four `[tldr]` scalars and the
 `[[tldr.terms]]` strings render as inline markdown, so they hold a sentence
-each, not paragraphs or lists.
+each, not paragraphs or lists. The scalars render beside the labels What, Why,
+Scope and Today, so each value is prose completing its label rather than a
+reply: one opening "Yes", "No" or "It does" answers a question the page never
+shows, and `review-branch render` warns on the common openers.
 
 `[tldr]` and `[overall]` do different jobs and must not be merged. `[tldr]` is
 neutral description: what a reviewer is looking at, stated so someone who has
