@@ -61,7 +61,8 @@ The data root is a git repo. Every write the tool itself performs (render, brows
     body = """Markdown explanation."""
     snippet = '''raw code, renderer escapes'''   # optional
     fix = "one-line suggested fix"               # optional
-    comment = """Draft comment body, markdown."""
+    comment = """Draft comment body, markdown. Opens with the title in bold, which
+                 seeds the draft rather than binding it; a human edit may move it."""
     comment_rev = 1           # bump on every rewrite of comment
     anchor = "runner/api.py:121"  # postable new-file line; falls back to file + last number in lines
     commentable = true        # false renders without a comment area

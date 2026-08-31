@@ -82,7 +82,7 @@ Field rules:
 - **`snippet`** -- optional. Include only when the code is short and the visual helps. Verbatim from source.
 - **`suggested_fix`** -- optional. Concrete and short. Skip if the description already makes the fix obvious.
 - **`reproduced`** -- `true` (you ran a test that confirms the bug), `false` (you tried to reproduce and couldn't, but still believe it's a bug), or `n/a` (didn't apply, e.g. naming / coverage findings).
-- **`draft_comment`** -- optional but encouraged for `high` / `med` findings. The exact text you'd paste into the MR/PR. Use the tone below.
+- **`draft_comment`** -- optional but encouraged for `high` / `med` findings. The exact text you'd paste into the MR/PR. Use the tone below. Start with the substance; the aggregator prepends the finding's title, and two lenses that both draft the same finding get their drafts merged, so a title you write yourself ends up stranded mid-comment.
 
 Empty result is `[]`. Nothing else.
 

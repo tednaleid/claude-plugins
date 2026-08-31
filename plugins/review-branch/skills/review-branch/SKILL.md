@@ -202,6 +202,25 @@ Every finding that warrants an MR/PR comment gets a `comment` draft (tone per
 `references/agent-contract.md`) and an `anchor` on a line the diff touches.
 Context-only findings get `commentable = false`.
 
+Each `comment` opens with the finding's title in bold on its own line, then a
+blank line, then the body:
+
+    comment = """**Pressing Grant to change a level silently strips module-admin**
+
+    The `syncLevel` fix is the right shape. Is `canAdmin` meant to stay outside it?
+    """
+
+The tracker shows the title above the card, but the MR reader gets only the
+comment, and a comment that opens mid-argument gives them nothing to attach it
+to. Add the line here rather than in the lens drafts: dedupe concatenates drafts
+from two lenses and may take the other one's title, so a title written upstream
+lands in the middle of the merged text.
+
+The title seeds the draft; it does not bind it. A human editing the body may
+take the comment somewhere the title no longer describes, and that edit wins.
+Never rewrite someone's comment to bring it back in line with the title, and
+never drop their opening line to restore the original.
+
 ### Writing the tl;dr
 
 `[tldr]` renders first, above the diagrams, and it is what lets a reviewer who
@@ -292,7 +311,8 @@ picks the mode:
 - "show me the edit here": print the revised body in the terminal instead.
 - "post the note about X" / "promote that note": promote the `[[minor]]` row
   to a full `[[findings]]` entry. Assign the next `f<N>` id, write a `comment`
-  draft (question-based tone) and an `anchor` on a line the diff touches,
+  draft (bold title line, then question-based tone) and an `anchor` on a line
+  the diff touches,
   remove the row from `[[minor]]`, then run `review-branch render`. From
   there it posts like any finding.
 - "post the checked ones" / `/glab-comment` / `/gh-comment`: interpret notes
