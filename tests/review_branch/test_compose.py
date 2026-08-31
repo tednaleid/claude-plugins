@@ -136,6 +136,56 @@ def test_summary_counts_minor_separately_from_findings():
     assert '<div class="num low">2</div>' in page  # the Minor notes card shows 2
 
 
+TLDR = {
+    "what": "Adds a `level` column to module grants.",
+    "why": "`read-only` was declarable but nothing produced it.",
+    "scope": "Three migrations and one handler.",
+    "behavior_change": "No user-visible change today.",
+    "terms": [{"term": "level", "definition": "what a person may do inside a module"}],
+}
+
+
+def test_tldr_renders_above_assets_and_overall():
+    review = {"review": {"title": "t"}, "findings": [], "tldr": TLDR,
+              "overall": {"body": "Solid."}}
+    page = review_tool.compose(review, {"findings": {}}, "<figure>marker-xyz</figure>", "route", "tok", True)
+    assert page.index('class="tldr"') < page.index("marker-xyz") < page.index("<h2>Overall</h2>")
+
+
+def test_tldr_labels_every_field_and_renders_inline_markdown():
+    review = {"review": {"title": "t"}, "findings": [], "tldr": TLDR}
+    page = review_tool.compose(review, {"findings": {}}, "", "route", "tok", True)
+    block = page[page.index('<div class="tldr">'):page.index("<h2>Findings</h2>")]
+    for label in ("What", "Why", "Scope", "Today", "Terms"):
+        assert f'<div class="k">{label}</div>' in block
+    assert "<code>level</code> column" in block
+    assert "<p>" not in block
+    assert "<dt>level</dt>" in block
+
+
+def test_tldr_omits_missing_fields_and_the_terms_row():
+    review = {"review": {"title": "t"}, "findings": [], "tldr": {"what": "Just this."}}
+    page = review_tool.compose(review, {"findings": {}}, "", "route", "tok", True)
+    block = page[page.index('<div class="tldr">'):page.index("<h2>Findings</h2>")]
+    assert '<div class="k">What</div>' in block
+    for label in ("Why", "Scope", "Today", "Terms"):
+        assert f'<div class="k">{label}</div>' not in block
+
+
+def test_review_without_tldr_renders_no_tldr_block():
+    review = {"review": {"title": "t"}, "findings": [], "overall": {"body": "Solid."}}
+    page = review_tool.compose(review, {"findings": {}}, "", "route", "tok", True)
+    assert 'class="tldr"' not in page
+
+
+def test_tldr_escapes_raw_html():
+    review = {"review": {"title": "t"}, "findings": [],
+              "tldr": {"what": "Renders <script>alert(1)</script> safely."}}
+    page = review_tool.compose(review, {"findings": {}}, "", "route", "tok", True)
+    assert "<script>alert(1)</script>" not in page
+    assert "&lt;script&gt;" in page
+
+
 def test_finding_also_list_renders_extra_sites():
     review = {
         "review": {"title": "t"},

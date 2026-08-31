@@ -32,10 +32,20 @@ The data root is a git repo. Every write the tool itself performs (render, brows
     merge_base = "f7abf751..."   # merge-base with the target branch
     spec = "docs/specs/..."   # optional
 
-    [overall]
-    body = """Markdown prose framing the change and headline asks."""
+    [tldr]                    # required; rendered first, above the diagrams
+    what = "One or two sentences: what this change makes true that was not true before."
+    why = "One or two sentences: the problem it solves - what was broken, missing, or impossible."
+    scope = "The surfaces a reviewer is actually looking at."
+    behavior_change = "Whether anything changes for a user today, and what."
 
-    [[assets]]                # optional, rendered in order below the header
+    [[tldr.terms]]            # optional; omit entirely when the change coins no vocabulary
+    term = "level"
+    definition = "what a person may do inside a module (read-only | read-write)"
+
+    [overall]
+    body = """Markdown prose: the verdict and the headline asks."""
+
+    [[assets]]                # optional, rendered in order below the tl;dr
     type = "svg"              # svg (xml declaration stripped) | html (verbatim)
     path = "diagram.svg"      # relative to the round directory; inlined at render
     caption = "..."           # optional
@@ -81,7 +91,15 @@ The data root is a git repo. Every write the tool itself performs (render, brows
     note = "..."              # one-sentence markdown; the nit itself
 
 Prose fields are markdown (commonmark plus tables). The renderer escapes
-everything else; never pre-escape content.
+everything else; never pre-escape content. The four `[tldr]` scalars and the
+`[[tldr.terms]]` strings render as inline markdown, so they hold a sentence
+each, not paragraphs or lists.
+
+`[tldr]` and `[overall]` do different jobs and must not be merged. `[tldr]` is
+neutral description: what a reviewer is looking at, stated so someone who has
+never seen the ticket can follow the rest of the page. `[overall]` is
+judgment: the verdict and the headline asks. `[overall]` does not re-describe
+the change.
 
 ## state.json
 

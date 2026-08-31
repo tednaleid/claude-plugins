@@ -13,6 +13,16 @@ title = "MR 9"
 vcs = "glab"
 url = "https://gitlab.example.com/g/p/-/merge_requests/9"
 
+[tldr]
+what = "Adds a level column."
+why = "read-only was declarable but nothing produced it."
+scope = "Three migrations and one handler."
+behavior_change = "No user-visible change today."
+
+[[tldr.terms]]
+term = "level"
+definition = "what a person may do inside a module"
+
 [[findings]]
 id = "f1"
 severity = "high"
@@ -68,6 +78,16 @@ def test_status_shape(round_dir, capsys):
     assert data["review"]["title"] == "MR 9"
     assert [f["id"] for f in data["findings"]] == ["f1", "f2", "f3"]
     assert data["findings"][0]["postable_body"] == "Comment A."
+    assert data["tldr"]["behavior_change"] == "No user-visible change today."
+    assert data["tldr"]["terms"] == [
+        {"term": "level", "definition": "what a person may do inside a module"}
+    ]
+
+
+def test_status_tldr_is_empty_when_absent(round_dir, capsys):
+    (round_dir / "review.toml").write_text('[review]\ntitle = "MR 9"\n')
+    assert review_tool.main(["status", str(round_dir)]) == 0
+    assert json.loads(capsys.readouterr().out)["tldr"] == {}
 
 
 def test_manifest_filters_and_anchors(round_dir, capsys):

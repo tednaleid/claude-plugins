@@ -189,7 +189,7 @@ drafts and `anchor`s). `low` and `info` become `[[minor]]` rows - one line each
 Write `$REVIEW_DIR/review.toml` incrementally per `references/data-format.md`:
 
 1. First `Write`: the `[review]` table (including `head_sha` and `merge_base`
-   from Step 5), `[overall]`, and any `[[hex]]`, `[[coverage]]`,
+   from Step 5), `[tldr]`, `[overall]`, and any `[[hex]]`, `[[coverage]]`,
    `[[files_touched]]`, `[[minor]]` rows.
 2. Then append the globally sorted findings in batches of about five per
    `Edit`. Never emit the whole document in one tool call.
@@ -201,6 +201,38 @@ still know which batch caused it.
 Every finding that warrants an MR/PR comment gets a `comment` draft (tone per
 `references/agent-contract.md`) and an `anchor` on a line the diff touches.
 Context-only findings get `commentable = false`.
+
+### Writing the tl;dr
+
+`[tldr]` renders first, above the diagrams, and it is what lets a reviewer who
+has never seen the ticket read the rest of the page. Write it for someone who
+knows the codebase and not this change.
+
+Derive it from the diff and the files you read. The MR/PR description is
+evidence, not a source: it was written by someone deep in the context and
+assuming it. Where the description and the code disagree, the code wins and the
+tl;dr says so.
+
+One or two sentences per field:
+
+| Field | Contains |
+|---|---|
+| `what` | What the change makes true that was not true before, in plain terms. |
+| `why` | The problem it solves: what was broken, missing, or impossible. |
+| `scope` | The surfaces a reviewer is actually looking at - which layers and files, and how wide. |
+| `behavior_change` | Whether anything changes for a user today, and what. A no-op refactor and a live behavior change need different reading; say which this is. |
+
+Add a `[[tldr.terms]]` entry for every word in `what` or `why` that is neither
+ordinary English nor already established vocabulary in this codebase. A term
+that resists a one-line definition means the sentence should be rewritten to
+avoid it. Omit the array when the change coins no vocabulary.
+
+Say the thing rather than pointing at it: no bare "criterion 8", no ticket
+number standing alone, no "as discussed". The reader has none of those to hand.
+
+When the MR/PR description or sibling branches sharing the ticket prefix show
+this is one of several dependent changes, `scope` names the position: which one
+this is, what precedes it, what depends on it, and whether merge order matters.
 
 ## Step 8: Diagram
 

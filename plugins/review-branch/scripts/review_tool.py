@@ -160,6 +160,7 @@ def cmd_status(round_dir: Path) -> dict:
     review = load_review(round_dir)
     return {
         "review": review.get("review", {}),
+        "tldr": review.get("tldr", {}),
         "findings": merged_findings(review, load_state(round_dir)),
     }
 
@@ -190,6 +191,10 @@ def esc(s) -> str:
 
 def md_html(text: str) -> str:
     return _MD.render(text or "")
+
+
+def md_inline(text: str) -> str:
+    return _MD.renderInline(text or "")
 
 
 def diff_link(meta: dict, path: str, line: int | None) -> str | None:
@@ -264,6 +269,27 @@ def summary_cards(findings: list[dict], minor_count: int = 0) -> str:
         f'<div class="label">Minor notes</div></div>'
     )
     return "\n".join(cards)
+
+
+_TLDR_ROWS = (("what", "What"), ("why", "Why"), ("scope", "Scope"), ("behavior_change", "Today"))
+
+
+def tldr_html(tldr: dict) -> str:
+    cells = [
+        f'<div class="k">{label}</div><div class="v">{md_inline(tldr[key])}</div>'
+        for key, label in _TLDR_ROWS
+        if tldr.get(key)
+    ]
+    terms = [t for t in tldr.get("terms", []) if t.get("term")]
+    if terms:
+        items = "".join(
+            f'<dt>{md_inline(t["term"])}</dt><dd>{md_inline(t.get("definition", ""))}</dd>'
+            for t in terms
+        )
+        cells.append(f'<div class="k">Terms</div><div class="v"><dl>{items}</dl></div>')
+    if not cells:
+        return ""
+    return '<div class="tldr">\n' + "\n".join(cells) + "\n</div>"
 
 
 def minor_html(minor: list[dict]) -> str:
@@ -425,6 +451,16 @@ TEMPLATE = """<!doctype html>
         padding: 12px; overflow-x: auto; margin: 8px 0; }
   code { background: var(--panel2); padding: 1px 5px; border-radius: 3px; }
   pre code { background: transparent; padding: 0; }
+  .tldr { display: grid; grid-template-columns: max-content 1fr; gap: 7px 16px;
+          background: var(--panel); border: 1px solid var(--border);
+          border-left: 4px solid var(--accent); border-radius: 6px;
+          padding: 14px 16px; margin: 0 0 6px; }
+  .tldr .k { color: var(--muted); font-size: 11px; text-transform: uppercase;
+             letter-spacing: .05em; padding-top: 3px; }
+  .tldr .v { font-size: 13.5px; }
+  .tldr dl { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; margin: 0; }
+  .tldr dt { font-family: var(--mono); font-size: 12.5px; }
+  .tldr dd { margin: 0; color: var(--muted); }
   figure.asset { margin: 20px 0; background: var(--panel); border: 1px solid var(--border);
                  border-radius: 6px; padding: 16px; overflow-x: auto; }
   figure.asset figcaption { color: var(--muted); font-size: 12px; margin-top: 8px; }
@@ -900,7 +936,7 @@ def compose(review: dict, state: dict, assets_html: str, route: str, token: str,
     meta = review.get("review", {})
     findings = merged_findings(review, state)
     minor = review.get("minor", [])
-    content = [assets_html]
+    content = [tldr_html(review.get("tldr", {})), assets_html]
     if review.get("overall", {}).get("body"):
         content.append("<h2>Overall</h2>\n" + md_html(review["overall"]["body"]))
     content.append("<h2>Findings</h2>")
