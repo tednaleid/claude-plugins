@@ -2,20 +2,37 @@
 install:
     #!/usr/bin/env bash
     set -euo pipefail
+    shopt -s nullglob
     claude plugin marketplace add tednaleid/claude-plugins 2>/dev/null || true
     claude plugin marketplace update tednaleid
+    plugin_version() {
+        claude plugin list 2>&1 | grep -A1 "$1@tednaleid" | grep "Version:" | awk '{print $2}'
+    }
+
     for dir in plugins/*/; do
         name=$(basename "$dir")
         # `install` no-ops when already present, so update in place instead.
-        if claude plugin list 2>/dev/null | grep -q "${name}@tednaleid"; then
+        if [ -n "$(plugin_version "$name")" ]; then
             echo "Updating $name..."
             claude plugin update "${name}@tednaleid"
         else
             echo "Installing $name..."
             claude plugin install "${name}@tednaleid"
         fi
-        version=$(claude plugin list 2>&1 | grep -A1 "${name}@tednaleid" | grep "Version:" | awk '{print $2}')
+        version=$(plugin_version "$name")
         echo "  Installed ${name} v${version}"
+
+        # A plugin that ships a CLI also keeps a copy on PATH, and its skills call
+        # that copy rather than the one in the cache. Refresh it from the version
+        # Claude Code just wrote so the two cannot drift. Installing is a file copy,
+        # so this runs unconditionally and repairs a stale bin dir even when the
+        # plugin version did not move.
+        for tool in "$HOME/.claude/plugins/cache/tednaleid/${name}/${version}"/scripts/*_tool.py; do
+            test -x "$tool" || continue
+            help=$("$tool" --help 2>&1 || true)
+            grep -qw install <<<"$help" || continue
+            "$tool" install | sed 's/^/  /'
+        done
     done
 
 # Run marketplace sync and verify it's up to date
@@ -126,4 +143,6 @@ test-all: test test-ui
 
 # Type-check the plugin scripts with ty
 typecheck:
-    uvx --with markdown-it-py ty check
+    # An inherited VIRTUAL_ENV outranks the environment uvx builds, so ty resolves
+    # imports against that site-packages instead and markdown-it-py reads as missing.
+    env -u VIRTUAL_ENV uvx --with markdown-it-py ty check
