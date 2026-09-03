@@ -1,6 +1,6 @@
 {
   "name": "review-branch",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "description": "Deep multi-lens review of an MR, PR, or any local branch. Dispatches 4 parallel subagents (architecture, security, test coverage, naming/API) inside an isolated worktree, writes structured findings to a central review store, and serves a collaborative HTML tracker from a local daemon with a per-finding post toggle, editable comment drafts, and notes to Claude. Nothing auto-posts; posting happens through companion comment skills only when explicitly asked. Works against GitLab (glab) and GitHub (gh); auto-detects from the git remote.",
   "author": {
     "name": "Ted Naleid"
