@@ -29,7 +29,7 @@ from urllib.parse import urlparse
 
 from markdown_it import MarkdownIt
 
-__version__ = "0.3.4"  # SYNC_PLUGIN_VERSION kept in step with plugin.json by scripts/sync-marketplace.ts
+__version__ = "0.3.5"  # SYNC_PLUGIN_VERSION kept in step with plugin.json by scripts/sync-marketplace.ts
 APP_NAME = "review-branch"
 DEFAULT_PORT = 43117
 
