@@ -20,8 +20,19 @@ Given an MR number, PR number, MR/PR URL, or branch name, the skill:
    anchors, plus an explanatory SVG diagram of what the branch does.
 6. Renders and serves the tracker: `review-branch url` prints a
    `http://127.0.0.1:43117/...` URL, and `review-branch open` launches it.
-   Both default to the newest round for the branch you have checked out, so
-   `review-branch open` on its own reopens the review you are working on.
+
+To reopen a review later, `review-branch open` takes a round directory, an
+MR/PR number, a branch, or a slug, and with no argument at all uses the branch
+you have checked out:
+
+```bash
+review-branch open           # the review for this branch
+review-branch open 336       # the review for MR/PR 336 in this repo
+review-branch list           # every round for this repo, newest first
+```
+
+When nothing matches it opens the index instead of failing, so a stray branch
+still lands you somewhere useful.
 
 In the tracker you toggle Post to MR on the findings you want posted (off by
 default), edit the comment drafts directly, and leave free-text notes

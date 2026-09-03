@@ -14,8 +14,12 @@ exists on disk.
   Idempotent.
 - `review-branch open <round-dir>` does all of that and launches the URL in
   the browser.
-- Both take the round directory as optional, falling back to the newest round
-  whose `source_branch` matches the branch checked out in the cwd.
+- Both take the target as optional. It may be a round directory, an MR/PR
+  number, a branch, or a slug; with none it is the branch checked out in the
+  cwd. Anything that resolves to no round falls back to the index page rather
+  than failing, with the candidates printed to stderr.
+- `review-branch list [--all]` prints those candidates as `slug/round  branch`,
+  newest first, for this repo or every repo.
 - `review-branch serve` runs the server in the foreground, printing a
   startup line with the clickable index URL before it blocks.
 - `review-branch stop` stops it via the pidfile in

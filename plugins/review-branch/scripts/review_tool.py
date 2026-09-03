@@ -33,8 +33,6 @@ __version__ = "0.3.5"  # SYNC_PLUGIN_VERSION kept in step with plugin.json by sc
 APP_NAME = "review-branch"
 DEFAULT_PORT = 43117
 
-SUBCOMMANDS = ("init", "render", "url", "open", "status", "manifest", "install", "serve", "stop")
-
 
 def data_root() -> Path:
     override = os.environ.get("REVIEW_BRANCH_HOME")
@@ -114,10 +112,24 @@ def round_number(round_dir: Path) -> int:
     return int(tail) if tail.isdigit() else 0
 
 
-def rounds_for_repo(repo_dir: Path) -> list[Path]:
-    base = data_root() / repo_id(repo_dir)
-    rounds = [p.parent for p in base.glob("*/round-*/review.toml")]
+def repo_id_or_exit(repo_dir: Path) -> str:
+    try:
+        return repo_id(repo_dir)
+    except RuntimeError:
+        raise SystemExit(f"{repo_dir} is not a git repository; pass a round directory")
+
+
+def by_recency(rounds) -> list[Path]:
     return sorted(rounds, key=lambda d: (d / "review.toml").stat().st_mtime, reverse=True)
+
+
+def rounds_for_repo(repo_dir: Path) -> list[Path]:
+    base = data_root() / repo_id_or_exit(repo_dir)
+    return by_recency(p.parent for p in base.glob("*/round-*/review.toml"))
+
+
+def all_rounds() -> list[Path]:
+    return by_recency(p.parent for p in data_root().glob("*/*/round-*/review.toml"))
 
 
 def source_branch_of(round_dir: Path) -> str | None:
@@ -128,31 +140,52 @@ def source_branch_of(round_dir: Path) -> str | None:
         return None
 
 
-def resolve_round(repo_dir: Path) -> Path:
-    """The newest round reviewing the branch checked out here.
+def newest_round(rounds) -> Path | None:
+    found = list(rounds)
+    return max(found, key=round_number) if found else None
 
-    Matches on the source_branch every round records, so an MR slugged mr-336
-    still resolves from its branch without asking the forge what 336 is.
+
+def resolve_target(repo_dir: Path, target: str | None) -> tuple[Path | None, str]:
+    """Find the round a target names, plus a label for what was searched for.
+
+    A directory holding a review.toml is taken as given. Otherwise the target is
+    an MR/PR number, a slug, or a branch name, and no target at all means the
+    branch checked out here. Matching on the source_branch every round records
+    means mr-336 resolves from its branch without asking the forge what 336 is.
+    A None round means nothing matched; the caller falls back to the index.
     """
-    try:
-        rid = repo_id(repo_dir)
-    except RuntimeError:
-        raise SystemExit(f"{repo_dir} is not a git repository; pass a round directory")
-    branch = git_ok(repo_dir, "rev-parse", "--abbrev-ref", "HEAD")
+    if target and (Path(target) / "review.toml").exists():
+        return Path(target), target
     rounds = rounds_for_repo(repo_dir)
+    if target is None:
+        branch = git_ok(repo_dir, "rev-parse", "--abbrev-ref", "HEAD") or "HEAD"
+        found = (d for d in rounds if source_branch_of(d) == branch)
+        return newest_round(found), f"branch {branch}"
+    if target.isdigit():
+        slugs = {f"mr-{target}", f"pr-{target}"}
+        return newest_round(d for d in rounds if d.parent.name in slugs), f"MR/PR {target}"
+    found = (d for d in rounds if target in (d.parent.name, source_branch_of(d)))
+    return newest_round(found), target
+
+
+def format_rounds(rounds: list[Path], with_repo: bool = False) -> str:
+    lines = []
+    for d in rounds:
+        name = f"{d.parent.name}/{d.name}"
+        if with_repo:
+            name = f"{d.parent.parent.name}/{name}"
+        lines.append(f"  {name:<30}  {source_branch_of(d) or '-'}")
+    return "\n".join(lines)
+
+
+def cmd_list(repo_dir: Path, everywhere: bool) -> int:
+    rounds = all_rounds() if everywhere else rounds_for_repo(repo_dir)
     if not rounds:
-        raise SystemExit(f"no reviews recorded for {rid}")
-    matches = [d for d in rounds if source_branch_of(d) == branch]
-    if matches:
-        return max(matches, key=round_number)
-    listing = "\n".join(
-        f"  {d.parent.name}/{d.name}  {source_branch_of(d) or '?'}" for d in rounds[:10]
-    )
-    raise SystemExit(
-        f"no review for branch {branch} in {rid}\n"
-        f"most recently touched rounds:\n{listing}\n"
-        f"pass a round directory, or browse http://127.0.0.1:{current_port()}/"
-    )
+        where = "any repo" if everywhere else repo_id_or_exit(repo_dir)
+        print(f"no reviews recorded for {where}", file=sys.stderr)
+        return 1
+    print(format_rounds(rounds, with_repo=everywhere))
+    return 0
 
 
 def load_review(round_dir: Path) -> dict:
@@ -1298,10 +1331,8 @@ def _wait(predicate, tries: int = 50, delay: float = 0.1) -> bool:
     return False
 
 
-def cmd_url(round_dir: Path) -> str:
-    if not (round_dir / "review.toml").exists():
-        raise SystemExit(f"{round_dir}: no review.toml")
-    route = route_for(round_dir)
+def ensure_daemon() -> int:
+    """Start or restart the daemon as needed. Returns the port it is serving on."""
     port = current_port()
     action = daemon_action(health_check(port))
     if action == "squatter":
@@ -1318,7 +1349,18 @@ def cmd_url(round_dir: Path) -> str:
         spawn_daemon(port)
         if not _wait(lambda: health_check(port) is not None):
             raise SystemExit(f"daemon failed to start; see {state_root() / 'daemon.log'}")
-    return f"http://127.0.0.1:{port}/{route}/"
+    return port
+
+
+def cmd_url(round_dir: Path) -> str:
+    if not (round_dir / "review.toml").exists():
+        raise SystemExit(f"{round_dir}: no review.toml")
+    route = route_for(round_dir)
+    return f"http://127.0.0.1:{ensure_daemon()}/{route}/"
+
+
+def index_url() -> str:
+    return f"http://127.0.0.1:{ensure_daemon()}/"
 
 
 def cmd_serve() -> int:
@@ -1400,11 +1442,18 @@ def main(argv: list[str] | None = None) -> int:
     p_init.add_argument("--slug", required=True)
     p_render = sub.add_parser("render", help="write review.html for a round")
     p_render.add_argument("review_dir")
-    branch_default = "defaults to the newest round reviewing the branch checked out here"
+    target_help = (
+        "round directory, MR/PR number, branch, or slug; "
+        "defaults to the branch checked out here, and falls back to the index"
+    )
     p_url = sub.add_parser("url", help="print a round's URL, starting the daemon if needed")
-    p_url.add_argument("review_dir", nargs="?", help=branch_default)
+    p_url.add_argument("target", nargs="?", help=target_help)
     p_open = sub.add_parser("open", help="open a round in the browser, starting the daemon if needed")
-    p_open.add_argument("review_dir", nargs="?", help=branch_default)
+    p_open.add_argument("target", nargs="?", help=target_help)
+    p_list = sub.add_parser("list", help="list review rounds for this repo, newest first")
+    p_list.add_argument(
+        "--all", action="store_true", dest="everywhere", help="every repo, not just this one"
+    )
     p_status = sub.add_parser("status", help="print the review merged with browser state, as JSON")
     p_status.add_argument("review_dir")
     p_manifest = sub.add_parser("manifest", help="print the posting batch for findings toggled on")
@@ -1431,9 +1480,20 @@ def main(argv: list[str] | None = None) -> int:
         exclude = {x for x in args.exclude.split(",") if x}
         print(json.dumps(cmd_manifest(Path(args.review_dir), exclude), indent=2))
         return 0
+    if args.command == "list":
+        return cmd_list(Path.cwd(), args.everywhere)
     if args.command in ("url", "open"):
-        round_dir = Path(args.review_dir) if args.review_dir else resolve_round(Path.cwd())
-        url = cmd_url(round_dir)
+        repo_dir = Path.cwd()
+        round_dir, wanted = resolve_target(repo_dir, args.target)
+        if round_dir is None:
+            rounds = rounds_for_repo(repo_dir)
+            listing = f"\n{format_rounds(rounds[:10])}" if rounds else ""
+            print(
+                f"no review for {wanted} in {repo_id_or_exit(repo_dir)}{listing}\n"
+                f"opening the index; `review-branch list` shows these in the terminal",
+                file=sys.stderr,
+            )
+        url = index_url() if round_dir is None else cmd_url(round_dir)
         print(url)
         if args.command == "open":
             webbrowser.open(url)
