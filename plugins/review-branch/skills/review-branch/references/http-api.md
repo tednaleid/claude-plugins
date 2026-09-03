@@ -8,10 +8,14 @@ exists on disk.
 
 ## Lifecycle
 
-- `review-branch open <round-dir>` starts the server if needed (detached via
+- `review-branch url <round-dir>` starts the server if needed (detached via
   `review-branch serve`, survives the launching session), restarts it when
   the CLI is newer than the running server, and prints the review URL.
   Idempotent.
+- `review-branch open <round-dir>` does all of that and launches the URL in
+  the browser.
+- Both take the round directory as optional, falling back to the newest round
+  whose `source_branch` matches the branch checked out in the cwd.
 - `review-branch serve` runs the server in the foreground, printing a
   startup line with the clickable index URL before it blocks.
 - `review-branch stop` stops it via the pidfile in

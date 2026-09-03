@@ -31,7 +31,7 @@ def test_open_uses_running_daemon(env, monkeypatch, capsys):
     port = srv.server_address[1]
     monkeypatch.setenv("REVIEW_BRANCH_PORT", str(port))
     try:
-        assert review_tool.main(["open", str(d)]) == 0
+        assert review_tool.main(["url", str(d)]) == 0
         out = capsys.readouterr().out.strip()
         assert out == f"http://127.0.0.1:{port}/proj-abcd/mr-3/round-1/"
     finally:
@@ -121,7 +121,7 @@ def test_open_spawns_daemon_on_dead_port(env, monkeypatch, capsys):
     d.mkdir(parents=True)
     (d / "review.toml").write_text(REVIEW_TOML)
     try:
-        assert review_tool.main(["open", str(d)]) == 0
+        assert review_tool.main(["url", str(d)]) == 0
         url = capsys.readouterr().out.strip()
         assert url == f"http://127.0.0.1:{port}/proj-abcd/mr-4/round-1/"
         health = review_tool.health_check(port)

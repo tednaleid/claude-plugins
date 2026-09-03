@@ -284,11 +284,12 @@ branches.
 
 ```bash
 review-branch render "$REVIEW_DIR"
-review-branch open "$REVIEW_DIR"
+review-branch url "$REVIEW_DIR"
 ```
 
-`open` prints the review URL. Offer to open it in the browser:
-`open <url>` (macOS).
+`url` starts the daemon if needed and prints the review URL without stealing
+focus. Offer to open it; `review-branch open "$REVIEW_DIR"` does the same thing
+and launches the browser too.
 
 ## Step 10: Report
 

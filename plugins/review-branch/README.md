@@ -18,8 +18,10 @@ Given an MR number, PR number, MR/PR URL, or branch name, the skill:
    naming) that read full source files and run tests.
 5. Aggregates findings into `review.toml`: severities, draft comments,
    anchors, plus an explanatory SVG diagram of what the branch does.
-6. Renders and serves the tracker: `review-branch open` prints a
-   `http://127.0.0.1:43117/...` URL.
+6. Renders and serves the tracker: `review-branch url` prints a
+   `http://127.0.0.1:43117/...` URL, and `review-branch open` launches it.
+   Both default to the newest round for the branch you have checked out, so
+   `review-branch open` on its own reopens the review you are working on.
 
 In the tracker you toggle Post to MR on the findings you want posted (off by
 default), edit the comment drafts directly, and leave free-text notes

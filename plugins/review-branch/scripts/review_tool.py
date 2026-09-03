@@ -21,6 +21,7 @@ import threading
 import time
 import tomllib
 import urllib.request
+import webbrowser
 from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -32,7 +33,7 @@ __version__ = "0.3.4"  # SYNC_PLUGIN_VERSION kept in step with plugin.json by sc
 APP_NAME = "review-branch"
 DEFAULT_PORT = 43117
 
-SUBCOMMANDS = ("init", "render", "open", "status", "manifest", "install", "serve", "stop")
+SUBCOMMANDS = ("init", "render", "url", "open", "status", "manifest", "install", "serve", "stop")
 
 
 def data_root() -> Path:
@@ -106,6 +107,52 @@ def cmd_init(slug: str, repo_dir: Path) -> Path:
     round_dir = base / f"round-{max(existing, default=0) + 1}"
     round_dir.mkdir(parents=True)
     return round_dir.resolve()
+
+
+def round_number(round_dir: Path) -> int:
+    tail = round_dir.name.removeprefix("round-")
+    return int(tail) if tail.isdigit() else 0
+
+
+def rounds_for_repo(repo_dir: Path) -> list[Path]:
+    base = data_root() / repo_id(repo_dir)
+    rounds = [p.parent for p in base.glob("*/round-*/review.toml")]
+    return sorted(rounds, key=lambda d: (d / "review.toml").stat().st_mtime, reverse=True)
+
+
+def source_branch_of(round_dir: Path) -> str | None:
+    """The branch a round reviewed. None when review.toml is missing or malformed."""
+    try:
+        return load_review(round_dir).get("review", {}).get("source_branch")
+    except SystemExit:
+        return None
+
+
+def resolve_round(repo_dir: Path) -> Path:
+    """The newest round reviewing the branch checked out here.
+
+    Matches on the source_branch every round records, so an MR slugged mr-336
+    still resolves from its branch without asking the forge what 336 is.
+    """
+    try:
+        rid = repo_id(repo_dir)
+    except RuntimeError:
+        raise SystemExit(f"{repo_dir} is not a git repository; pass a round directory")
+    branch = git_ok(repo_dir, "rev-parse", "--abbrev-ref", "HEAD")
+    rounds = rounds_for_repo(repo_dir)
+    if not rounds:
+        raise SystemExit(f"no reviews recorded for {rid}")
+    matches = [d for d in rounds if source_branch_of(d) == branch]
+    if matches:
+        return max(matches, key=round_number)
+    listing = "\n".join(
+        f"  {d.parent.name}/{d.name}  {source_branch_of(d) or '?'}" for d in rounds[:10]
+    )
+    raise SystemExit(
+        f"no review for branch {branch} in {rid}\n"
+        f"most recently touched rounds:\n{listing}\n"
+        f"pass a round directory, or browse http://127.0.0.1:{current_port()}/"
+    )
 
 
 def load_review(round_dir: Path) -> dict:
@@ -861,7 +908,7 @@ TEMPLATE = """<!doctype html>
       setSaveStatus("saved");
     }).catch(function () {
       setSaveStatus("error");
-      showBanner("save failed (server error or unreachable) - " + dirty + " unsaved change(s) held in this tab. check daemon.log or restart with: review-branch open <review-dir>", true);
+      showBanner("save failed (server error or unreachable) - " + dirty + " unsaved change(s) held in this tab. check daemon.log or restart with: review-branch open", true);
       saveTimer = setTimeout(save, 5000);
     });
   }
@@ -879,7 +926,7 @@ TEMPLATE = """<!doctype html>
 
   if (!served) {
     document.querySelectorAll("textarea, input").forEach(function (el) { el.disabled = true; });
-    showBanner("read-only snapshot - run: review-branch open <review-dir> to edit", false);
+    showBanner("read-only snapshot - run: review-branch open to edit", false);
     saveStatus.textContent = "Read-only snapshot";
     saveStatus.className = "save-status saved";
     if (indexLink) indexLink.hidden = true;
@@ -1251,7 +1298,7 @@ def _wait(predicate, tries: int = 50, delay: float = 0.1) -> bool:
     return False
 
 
-def cmd_open(round_dir: Path) -> str:
+def cmd_url(round_dir: Path) -> str:
     if not (round_dir / "review.toml").exists():
         raise SystemExit(f"{round_dir}: no review.toml")
     route = route_for(round_dir)
@@ -1351,11 +1398,18 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command")
     p_init = sub.add_parser("init", help="create the next round directory for a review")
     p_init.add_argument("--slug", required=True)
-    for name in ("render", "open", "status", "manifest"):
-        p = sub.add_parser(name)
-        p.add_argument("review_dir")
-    p_manifest = sub._name_parser_map["manifest"]
-    p_manifest.add_argument("--exclude", default="")
+    p_render = sub.add_parser("render", help="write review.html for a round")
+    p_render.add_argument("review_dir")
+    branch_default = "defaults to the newest round reviewing the branch checked out here"
+    p_url = sub.add_parser("url", help="print a round's URL, starting the daemon if needed")
+    p_url.add_argument("review_dir", nargs="?", help=branch_default)
+    p_open = sub.add_parser("open", help="open a round in the browser, starting the daemon if needed")
+    p_open.add_argument("review_dir", nargs="?", help=branch_default)
+    p_status = sub.add_parser("status", help="print the review merged with browser state, as JSON")
+    p_status.add_argument("review_dir")
+    p_manifest = sub.add_parser("manifest", help="print the posting batch for findings toggled on")
+    p_manifest.add_argument("review_dir")
+    p_manifest.add_argument("--exclude", default="", help="comma-separated finding ids to hold back")
     sub.add_parser("install", help="copy scripts to the bin dir")
     sub.add_parser("serve", help="run the server in the foreground")
     sub.add_parser("stop", help="stop the daemon via pidfile")
@@ -1377,8 +1431,12 @@ def main(argv: list[str] | None = None) -> int:
         exclude = {x for x in args.exclude.split(",") if x}
         print(json.dumps(cmd_manifest(Path(args.review_dir), exclude), indent=2))
         return 0
-    if args.command == "open":
-        print(cmd_open(Path(args.review_dir)))
+    if args.command in ("url", "open"):
+        round_dir = Path(args.review_dir) if args.review_dir else resolve_round(Path.cwd())
+        url = cmd_url(round_dir)
+        print(url)
+        if args.command == "open":
+            webbrowser.open(url)
         return 0
     if args.command == "install":
         return cmd_install()
